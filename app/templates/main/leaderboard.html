@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard{% endblock %}
+{% block body_class %}leaderboard-body{% endblock %}
+{% block content %}
+<div class="leaderboard-page">
+  <h1 class="leaderboard-h1">Leaderboard</h1>
+
+  <ul class="nav nav-pills lb-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#lb-round" type="button" role="tab">This round</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lb-season" type="button" role="tab">Season</button>
+    </li>
+  </ul>
+
+  <div class="tab-content lb-tab-content">
+    <div class="tab-pane fade show active" id="lb-round" role="tabpanel">
+      {% if round is none %}
+        <p class="leaderboard-muted">There's no round to show a leaderboard for yet.</p>
+      {% else %}
+        <div class="lb-round-name">{{ round.name }}</div>
+        {% if financial_summary and financial_summary.rows %}
+          <table class="lb-table">
+            <thead><tr><th>#</th><th>Player</th><th>Round pts</th><th>Result</th></tr></thead>
+            <tbody>
+              {% for row in financial_summary.rows %}
+                <tr class="{{ 'is-me' if row.user.id == current_user.id }}{{ ' is-winner' if row.is_winner }}">
+                  <td>{{ loop.index }}</td>
+                  <td>{{ row.user.username }}{% if row.is_winner %} <span class="winner-star" title="Round winner">&#9733;</span>{% endif %}</td>
+                  <td>{{ row.round_points }}</td>
+                  <td class="financial-cell{{ ' is-positive' if row.financial_result and row.financial_result > 0 }}{{ ' is-negative' if row.financial_result and row.financial_result < 0 }}">
+                    {% if row.financial_result is none %}
+                      <span class="pending-result">pending</span>
+                    {% else %}
+                      {{ row.financial_result | gbp(signed=True) }}
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="lb-pot-note">
+            Pot: {{ financial_summary.pot | gbp }} &middot; {{ financial_summary.entrant_count }} opted in
+            {% if not financial_summary.settled %}&middot; <span class="pending-result">awaiting results</span>{% endif %}
+          </p>
+        {% else %}
+          <p class="leaderboard-muted">No one has opted in to this round yet.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="tab-pane fade" id="lb-season" role="tabpanel">
+      {% if season_financial_rows %}
+        <table class="lb-table">
+          <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Balance</th></tr></thead>
+          <tbody>
+            {% for user, points, balance in season_financial_rows %}
+              <tr class="{{ 'is-me' if user.id == current_user.id }}">
+                <td>{{ loop.index }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ points }}</td>
+                <td class="financial-cell{{ ' is-positive' if balance > 0 }}{{ ' is-negative' if balance < 0 }}">{{ balance | gbp(signed=True) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="leaderboard-muted">No one has taken part in the pot yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+  body.leaderboard-body {
+    background: #121417;
+  }
+  body.leaderboard-body .navbar,
+  body.leaderboard-body footer {
+    background-color: #121417 !important;
+  }
+  .leaderboard-page {
+    color: #e9ecef;
+  }
+  .leaderboard-h1 {
+    color: #fff;
+    font-size: 1.4rem;
+    margin-bottom: 0.75rem;
+  }
+  .leaderboard-muted {
+    color: #9aa3ad;
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+  }
+  .lb-round-name {
+    font-weight: 700;
+    color: #fff;
+    font-size: 1rem;
+    margin: 0.75rem 0 0.4rem;
+  }
+  .lb-tabs {
+    margin-top: 0.5rem;
+  }
+  .lb-tabs .nav-link {
+    color: #9aa3ad;
+  }
+  .lb-tabs .nav-link.active {
+    background-color: #ffc107;
+    color: #121417;
+    font-weight: 600;
+  }
+  .lb-tab-content {
+    margin-top: 0.75rem;
+  }
+  .lb-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .lb-table th, .lb-table td {
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid #2a2f36;
+    text-align: left;
+  }
+  .lb-table th {
+    color: #9aa3ad;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .lb-table td:first-child, .lb-table th:first-child {
+    width: 2rem;
+    color: #9aa3ad;
+  }
+  .lb-table tr.is-me td {
+    background: rgba(64, 145, 255, 0.12);
+    color: #cfe2ff;
+    font-weight: 600;
+  }
+  .lb-table tr.is-winner td {
+    background: rgba(255, 209, 102, 0.08);
+  }
+  .winner-star {
+    color: #ffd166;
+  }
+  .financial-cell {
+    font-weight: 600;
+    color: #9aa3ad;
+  }
+  .financial-cell.is-positive {
+    color: #6ee7a0;
+  }
+  .financial-cell.is-negative {
+    color: #ef6b6b;
+  }
+  .pending-result {
+    font-weight: 400;
+    font-style: italic;
+    color: #6c757d;
+  }
+  .lb-pot-note {
+    margin-top: 0.6rem;
+    font-size: 0.8rem;
+    color: #9aa3ad;
+  }
+</style>
+{% endblock %}

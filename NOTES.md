@@ -14,6 +14,9 @@ polling during match windows, daily sync otherwise, all logged to `PollLog` and 
 in the admin panel (`/admin/polling`, plus a "last run" summary on `/admin/`).
 
 **Built this session:**
+- **Navigation redesign — split the players home screen into focused screens** with
+  a mobile-style bottom tile bar (Home / Predictions / Leaderboard / Admin). See
+  [[Navigation redesign]].
 - **Live match scores on the results page** — `main/round_results.html` shows a live
   `LIVE <minute>'` badge + running score, final score + winner, or "Not started", and
   auto-refreshes every 3 minutes via `fetch` against the new `main.round_live_scores`
@@ -196,16 +199,45 @@ as `round_results`) every 3 minutes via `fetch` to refresh scores in place witho
 full reload — matching the scheduler's live-poll cadence (app/scheduler.py), with a
 visible note that scores can run up to ~10 minutes behind real time as a result.
 
-### Live round leaderboard — main.round_leaderboard_view / round_leaderboard_live
+### Round leaderboard — leaderboards.round_leaderboard
 `app/leaderboards.round_leaderboard` returns `(user, round_points, tournament_points)`
 rather than just round points — showing both side by side lets a user see, as results
 land mid-round, both how this round is going *and* where it leaves them overall, without
-a separate lookup. The page (`main/round_leaderboard.html`) auto-refreshes via the same
-`fetch`-every-3-minutes pattern as the live score feed (`main.round_leaderboard_live`,
-[[Live score display]]), rebuilding the table in place from JSON so points update as
-fixtures finish and `score_fixture` reruns — no manual reload needed. If the active round
-itself changes between polls (archived/published mid-session), the refresh is a no-op and
-a future full page load picks up the new round, rather than splicing mismatched data in.
+a separate lookup. **Superseded by [[Navigation redesign]]**: the live-polling
+`main.round_leaderboard_live` JSON endpoint and its auto-refreshing page
+(`main/round_leaderboard.html`) were removed in favour of a plain server-rendered
+`main.leaderboard` screen — the financial settlement it shows is computed per-load
+anyway, so a 3-minute live poll added little for the added complexity.
+
+### Navigation redesign — bottom tile bar + dedicated screens
+The previous "single home screen" layout (players grid + inline prediction entry +
+both leaderboards all on `main.players`) got cramped as more was bolted onto it
+(opt-in/pot status, financial summaries, live polling). Split back out into a small
+set of focused screens, navigated via a fixed bottom tile bar (`base.html`,
+mobile-first/PWA-style — Home / Predictions / Leaderboard, plus Admin for admins)
+that replaces the old top navbar links for authenticated users:
+
+- **`main.players` ("Home")** — now a *read-only* gameweek overview: pot/opt-in
+  status and the players grid (clock icons hide everyone's picks, including your
+  own, until the round locks — editing your own moved off this screen entirely).
+  Two quick-link tiles (`players-actions`) point at the other two screens.
+- **`predictions.my_predictions` ("Predictions")** — new dedicated screen
+  (`predictions/edit.html`) for entering/editing your own picks before the
+  deadline; the inline per-cell score-input editing on the grid is gone. Requires
+  having opted in first (the home screen prompts for that; landing here without
+  opting in redirects back with a flash nudge).
+- **`main.leaderboard` ("Leaderboard")** — new dedicated screen
+  (`main/leaderboard.html`, replacing the old in-page tabs on `main.players`)
+  with the same two tabs (this round's pot standings + season table), now able to
+  breathe with its own page.
+
+`main.round_leaderboard_view`/`main.tournament_leaderboard_view` still redirect
+(now to `main.leaderboard`) to keep old bookmarks alive. The live-refreshing
+`main.round_leaderboard_live` JSON endpoint was removed along with the in-page
+leaderboard it fed — `main.leaderboard` is now a plain server-rendered page (the
+financial settlement it shows is computed per-load anyway, so a live poll added
+little). `_cell` in `main.py` lost its `editable` status — every cell is now either
+`hidden` or one of the post-lock states, since editing happens on its own screen.
 
 ### Password hashing
 Explicitly set to `pbkdf2:sha256` in `User.set_password` — werkzeug's default (`scrypt`)

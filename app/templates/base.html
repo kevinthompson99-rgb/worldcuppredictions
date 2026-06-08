@@ -6,7 +6,7 @@
   <title>{% block title %}World Cup 2026 Predictions{% endblock %}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% if current_user.is_authenticated %}has-bottom-nav {% endif %}{% block body_class %}{% endblock %}">
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
       <a class="navbar-brand" href="{{ url_for('main.index') }}">World Cup 2026 Predictions</a>
@@ -65,6 +65,68 @@
     <small>&copy; {{ current_year }} World Cup 2026 Predictions &mdash; for fun among friends, no money changes hands here.</small>
   </footer>
 
+  {% if current_user.is_authenticated %}
+  {# Mobile-first PWA-style bottom tile bar - the primary way regular users move
+     between the few focused screens (admins get a fifth tile to their own area). #}
+  <nav class="bottom-nav" aria-label="Primary">
+    <a href="{{ url_for('main.players') }}" class="bottom-nav-item{{ ' active' if request.endpoint == 'main.players' }}">
+      <span class="bottom-nav-icon">&#127968;</span>
+      <span class="bottom-nav-label">Home</span>
+    </a>
+    <a href="{{ url_for('predictions.my_predictions') }}" class="bottom-nav-item{{ ' active' if request.endpoint == 'predictions.my_predictions' }}">
+      <span class="bottom-nav-icon">&#9999;&#65039;</span>
+      <span class="bottom-nav-label">Predictions</span>
+    </a>
+    <a href="{{ url_for('main.leaderboard') }}" class="bottom-nav-item{{ ' active' if request.endpoint == 'main.leaderboard' }}">
+      <span class="bottom-nav-icon">&#127942;</span>
+      <span class="bottom-nav-label">Leaderboard</span>
+    </a>
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('admin.dashboard') }}" class="bottom-nav-item{{ ' active' if request.blueprint == 'admin' }}">
+      <span class="bottom-nav-icon">&#9881;&#65039;</span>
+      <span class="bottom-nav-label">Admin</span>
+    </a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <style>
+    body.has-bottom-nav {
+      padding-bottom: 4.5rem;
+    }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 1030;
+      display: flex;
+      background: #1a1e24;
+      border-top: 1px solid #2a2f36;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .bottom-nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      padding: 0.5rem 0.25rem 0.4rem;
+      color: #9aa3ad;
+      text-decoration: none;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .bottom-nav-icon {
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+    .bottom-nav-item.active {
+      color: #ffc107;
+    }
+  </style>
 </body>
 </html>

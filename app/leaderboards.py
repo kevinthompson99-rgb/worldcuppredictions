@@ -16,8 +16,8 @@ def round_leaderboard(round_: Round):
 
     Surfacing the tournament total alongside the round total lets users see, as results
     come in during a round, both how they're doing this round *and* where that leaves
-    them overall - without a separate page lookup (see main.round_leaderboard_view /
-    round_leaderboard_live, which polls this on the same cadence as live scores).
+    them overall - without a separate page lookup (see main.leaderboard, and
+    app.finance.round_financial_summary which layers the pot settlement on top).
     """
     round_points = (
         db.session.query(

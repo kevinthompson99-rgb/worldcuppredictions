@@ -27,35 +27,40 @@
       {% if opt_in_open and opt_in_form %}
         <form method="post" action="{{ url_for('main.round_opt_in') }}" class="opt-in-form">
           {{ opt_in_form.hidden_tag() }}
-          {% if opted_in %}
-            <button type="submit" class="btn btn-outline-danger btn-sm opt-in-btn">Leave this round</button>
-          {% else %}
-            <button type="submit" class="btn btn-warning btn-sm opt-in-btn">Join this round ({{ stake_amount | gbp }})</button>
-          {% endif %}
+          <button type="submit" class="btn btn-warning btn-sm opt-in-btn">Join this round ({{ stake_amount | gbp }})</button>
         </form>
       {% elif not opted_in %}
         <div class="opt-in-closed">Opt-in is closed for this round &mdash; you weren't entered into the pot.</div>
+      {% else %}
+        <div class="opt-in-confirmed">You're in this round's pot &mdash; good luck!</div>
       {% endif %}
+    </div>
+
+    {# ---- Quick links to the dedicated screens ---- #}
+    <div class="players-actions">
+      <a href="{{ url_for('predictions.my_predictions') }}" class="players-action-tile">
+        <span class="players-action-icon">&#9999;&#65039;</span>
+        <span class="players-action-label">My predictions</span>
+      </a>
+      <a href="{{ url_for('main.leaderboard') }}" class="players-action-tile">
+        <span class="players-action-icon">&#127942;</span>
+        <span class="players-action-label">Leaderboard</span>
+      </a>
     </div>
 
     {% if not grid %}
       <p class="players-muted">{{ round.name }} doesn't have any fixtures assigned yet.</p>
     {% else %}
 
-      {% if not locked %}
-        {% if opted_in %}
-          <p class="players-hint">
-            Tap the boxes in your column (<span class="me-chip">{{ current_user.username }}</span>) below to enter or
-            change your scores &mdash; everyone else's stay hidden until the round locks.
-          </p>
-        {% elif opt_in_open %}
-          <p class="players-hint opt-in-prompt">
-            Join this round above to enter your predictions and take part in the {{ stake_amount | gbp }} pot.
-          </p>
-        {% endif %}
+      {% if not locked and opt_in_open %}
+        <p class="players-hint opt-in-prompt">
+          Join this round above to take part in the {{ stake_amount | gbp }} pot &mdash; you'll need to before you can enter predictions.
+        </p>
+      {% elif not locked %}
+        <p class="players-hint">
+          Predictions are hidden here until the round locks &mdash; head to <a href="{{ url_for('predictions.my_predictions') }}">My predictions</a> to enter or check yours.
+        </p>
       {% endif %}
-
-      {% if form %}<form method="post" novalidate class="predictions-form">{{ form.hidden_tag() }}{% endif %}
 
       <div class="players-grid-wrap" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
         <table class="players-grid">
@@ -86,17 +91,8 @@
                   </div>
                 </th>
                 {% for cell in row.cells %}
-                  <td class="score-cell{{ ' is-me' if cell.user_id == current_user.id }}{{ ' is-correct' if cell.status in ('correct', 'exact') }}{{ ' is-exact' if cell.status == 'exact' }}{{ ' is-editable' if cell.status == 'editable' }}">
-                    {% if cell.status == 'editable' %}
-                      <span class="score-edit">
-                        {{ form["home_" ~ cell.fixture_id](class_="score-input") }}<span class="dash">&ndash;</span>{{ form["away_" ~ cell.fixture_id](class_="score-input") }}
-                      </span>
-                      {% for field_name in ["home_" ~ cell.fixture_id, "away_" ~ cell.fixture_id] %}
-                        {% for error in form[field_name].errors %}
-                          <div class="score-error">{{ error }}</div>
-                        {% endfor %}
-                      {% endfor %}
-                    {% elif cell.status == 'hidden' %}
+                  <td class="score-cell{{ ' is-me' if cell.user_id == current_user.id }}{{ ' is-correct' if cell.status in ('correct', 'exact') }}{{ ' is-exact' if cell.status == 'exact' }}">
+                    {% if cell.status == 'hidden' %}
                       <span class="cell-icon clock-icon" title="Submitted &mdash; hidden until the round locks">&#9201;</span>
                     {% elif cell.status == 'no_pick' %}
                       <span class="cell-empty" title="No prediction submitted">&ndash;</span>
@@ -114,13 +110,6 @@
         </table>
       </div>
 
-      {% if form %}
-        <div class="predictions-actions">
-          <button type="submit" class="btn btn-warning btn-sm">Save my predictions</button>
-        </div>
-        </form>
-      {% endif %}
-
       <div class="players-key">
         <span class="key-item"><span class="cell-icon clock-icon">&#9201;</span> submitted &amp; hidden until lock</span>
         <span class="key-item"><span class="key-swatch correct-swatch"></span> correct result</span>
@@ -129,65 +118,6 @@
         <span class="key-item"><span class="key-swatch me-swatch"></span> your column</span>
       </div>
     {% endif %}
-
-    {# ---- Leaderboards ---- #}
-    <div class="leaderboard-section">
-      <h2 class="section-heading">Leaderboard</h2>
-      <ul class="nav nav-pills lb-tabs" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#lb-round" type="button" role="tab">This round</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lb-tournament" type="button" role="tab">Tournament</button>
-        </li>
-      </ul>
-      <div class="tab-content lb-tab-content">
-        <div class="tab-pane fade show active" id="lb-round" role="tabpanel">
-          {% if financial_summary and financial_summary.rows %}
-            <table class="lb-table" id="round-leaderboard-table">
-              <thead><tr><th>#</th><th>Player</th><th>Round pts</th><th>Result</th></tr></thead>
-              <tbody>
-                {% for row in financial_summary.rows %}
-                  <tr data-user-id="{{ row.user.id }}" class="{{ 'is-me' if row.user.id == current_user.id }}{{ ' is-winner' if row.is_winner }}">
-                    <td class="js-rank">{{ loop.index }}</td>
-                    <td>{{ row.user.username }}{% if row.is_winner %} <span class="winner-star" title="Round winner">&#9733;</span>{% endif %}</td>
-                    <td class="js-round-points">{{ row.round_points }}</td>
-                    <td class="financial-cell{{ ' is-positive' if row.financial_result and row.financial_result > 0 }}{{ ' is-negative' if row.financial_result and row.financial_result < 0 }}">
-                      {% if row.financial_result is none %}
-                        <span class="pending-result">pending</span>
-                      {% else %}
-                        {{ row.financial_result | gbp(signed=True) }}
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          {% else %}
-            <p class="players-muted">No one has opted in to this round yet.</p>
-          {% endif %}
-        </div>
-        <div class="tab-pane fade" id="lb-tournament" role="tabpanel">
-          {% if season_financial_rows %}
-            <table class="lb-table">
-              <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Balance</th></tr></thead>
-              <tbody>
-                {% for user, points, balance in season_financial_rows %}
-                  <tr class="{{ 'is-me' if user.id == current_user.id }}">
-                    <td>{{ loop.index }}</td>
-                    <td>{{ user.username }}</td>
-                    <td>{{ points }}</td>
-                    <td class="financial-cell{{ ' is-positive' if balance > 0 }}{{ ' is-negative' if balance < 0 }}">{{ balance | gbp(signed=True) }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          {% else %}
-            <p class="players-muted">No one has taken part in the pot yet.</p>
-          {% endif %}
-        </div>
-      </div>
-    </div>
   {% endif %}
 </div>
 
@@ -229,9 +159,7 @@
   }
 
   // Live score updates only matter once the round has locked - before that
-  // nothing's being played and the endpoint isn't even available (403). The
-  // leaderboard's financial settlement is computed server-side on each load,
-  // so a full page refresh (rather than a live poll) is what picks that up.
+  // nothing's being played and the endpoint isn't even available (403).
   if (locked) {
     setInterval(refreshScores, REFRESH_MS);
   }
@@ -267,15 +195,6 @@
   .players-hint {
     margin: 0.75rem 0 0.5rem;
   }
-  .me-chip {
-    display: inline-block;
-    padding: 0.05rem 0.4rem;
-    border-radius: 0.3rem;
-    background: rgba(64, 145, 255, 0.25);
-    color: #cfe2ff;
-    font-weight: 600;
-  }
-
   .round-card {
     background: #1f242b;
     border: 1px solid #2a2f36;
@@ -322,23 +241,41 @@
   .opt-in-prompt {
     color: #ffd166;
   }
-  .winner-star {
-    color: #ffd166;
-  }
-  .financial-cell {
-    font-weight: 600;
-    color: #9aa3ad;
-  }
-  .financial-cell.is-positive {
+  .opt-in-confirmed {
+    margin-top: 0.6rem;
+    font-size: 0.8rem;
     color: #6ee7a0;
   }
-  .financial-cell.is-negative {
-    color: #ef6b6b;
+
+  .players-actions {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 0.6rem;
   }
-  .pending-result {
-    font-weight: 400;
-    font-style: italic;
-    color: #6c757d;
+  .players-action-tile {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    background: #1f242b;
+    border: 1px solid #2a2f36;
+    border-radius: 0.6rem;
+    padding: 0.75rem 0.5rem;
+    text-decoration: none;
+    color: #e9ecef;
+    transition: background-color 0.15s ease;
+  }
+  .players-action-tile:hover {
+    background: #262c34;
+    color: #fff;
+  }
+  .players-action-icon {
+    font-size: 1.4rem;
+  }
+  .players-action-label {
+    font-size: 0.8rem;
+    font-weight: 600;
   }
 
   .players-grid-wrap {
@@ -467,9 +404,6 @@
   .score-cell.is-me {
     box-shadow: inset 0 0 0 9999px rgba(64, 145, 255, 0.16);
   }
-  .score-cell.is-editable {
-    background: rgba(64, 145, 255, 0.1);
-  }
   .cell-score {
     font-weight: 600;
     color: #e9ecef;
@@ -485,41 +419,6 @@
   }
   .star-icon {
     color: #ffd43b;
-  }
-
-  .score-edit {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-  .score-input {
-    width: 2.4rem;
-    text-align: center;
-    background: #0f1115;
-    border: 1px solid #3a4250;
-    border-radius: 0.35rem;
-    color: #e9ecef;
-    padding: 0.25rem 0;
-    font-size: 0.9rem;
-  }
-  .score-input:focus {
-    outline: none;
-    border-color: #4091ff;
-    box-shadow: 0 0 0 0.15rem rgba(64, 145, 255, 0.25);
-  }
-  .score-edit .dash {
-    color: #6c757d;
-  }
-  .score-error {
-    margin-top: 0.2rem;
-    font-size: 0.65rem;
-    color: #ff8080;
-    white-space: normal;
-    max-width: 6rem;
-  }
-
-  .predictions-actions {
-    margin-top: 0.75rem;
   }
 
   .players-key {
@@ -550,66 +449,6 @@
   }
   .me-swatch {
     background: rgba(64, 145, 255, 0.3);
-  }
-
-  /* ---- Leaderboard section ---- */
-  .leaderboard-section {
-    margin-top: 1.5rem;
-  }
-  .section-heading {
-    color: #fff;
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
-  }
-  .lb-tabs .nav-link {
-    color: #9aa3ad;
-    background: #1f242b;
-    border: 1px solid #2a2f36;
-    margin-right: 0.4rem;
-    font-size: 0.8rem;
-    border-radius: 1rem;
-    padding: 0.25rem 0.9rem;
-  }
-  .lb-tabs .nav-link.active {
-    color: #16181b;
-    background: #f0b429;
-    border-color: #f0b429;
-  }
-  .lb-tab-content {
-    margin-top: 0.6rem;
-    background: #181b20;
-    border: 1px solid #2a2f36;
-    border-radius: 0.6rem;
-    overflow: hidden;
-  }
-  .lb-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.82rem;
-  }
-  .lb-table th, .lb-table td {
-    padding: 0.5rem 0.7rem;
-    text-align: left;
-    border-bottom: 1px solid #262b32;
-    color: #e9ecef;
-  }
-  .lb-table th {
-    color: #9aa3ad;
-    font-weight: 600;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .lb-table td:first-child, .lb-table th:first-child {
-    width: 2.5rem;
-    color: #9aa3ad;
-  }
-  .lb-table tr.is-me {
-    background: rgba(64, 145, 255, 0.14);
-  }
-  .lb-table tr.is-me td {
-    color: #fff;
-    font-weight: 600;
   }
 
   @media (min-width: 768px) {
