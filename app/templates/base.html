@@ -31,7 +31,7 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
       <a class="navbar-brand d-flex flex-column align-items-center lh-1" href="{{ url_for('main.index') }}">
-        <span style="font-weight:800;letter-spacing:.06em;">LEBIM</span>
+        <span style="font-weight:800;letter-spacing:.06em;font-size:1.25em;color:#ffd166;">LEBIM</span>
         <span style="font-size:.7em;font-weight:400;opacity:.85;">World Cup 2026 Predictions</span>
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -134,6 +134,17 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+  (function () {
+    document.querySelectorAll('.alert-success').forEach(function (el) {
+      setTimeout(function () {
+        var bsAlert = bootstrap.Alert.getOrCreateInstance(el);
+        bsAlert.close();
+      }, 3000);
+    });
+  })();
+  </script>
 
   <script>
   (function () {

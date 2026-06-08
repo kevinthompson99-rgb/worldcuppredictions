@@ -129,9 +129,16 @@ def players():
 
     standings = tournament_standings()
 
+    upcoming = [f for f in fixtures if not f.is_finished and not f.is_live]
+    next_kickoff = (
+        min(upcoming, key=lambda f: f.kickoff_at).kickoff_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if upcoming else None
+    )
+
     return render_template(
         "main/players.html",
         round=round_,
+        fixtures=fixtures,
         users=users,
         total_users=User.query.count(),
         grid=grid,
@@ -143,6 +150,7 @@ def players():
         opt_in_form=opt_in_form,
         stake_amount=round_.stake_amount if round_ is not None else None,
         pot=round_pot(len(users), round_.stake_amount) if round_ is not None else None,
+        next_kickoff=next_kickoff,
     )
 
 

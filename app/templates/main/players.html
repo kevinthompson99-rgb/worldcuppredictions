@@ -3,6 +3,10 @@
 {% block body_class %}players-body{% endblock %}
 {% block content %}
 <div class="players-page">
+  {% if next_kickoff %}
+    <div id="js-countdown" class="match-countdown" data-kickoff="{{ next_kickoff }}"></div>
+  {% endif %}
+
   {% if round is none %}
     <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
   {% else %}
@@ -108,6 +112,29 @@
 
 <script>
 (function () {
+  var cdEl = document.getElementById('js-countdown');
+  if (cdEl) {
+    var target = new Date(cdEl.dataset.kickoff);
+    function tick() {
+      var diff = target - Date.now();
+      if (diff <= 0) {
+        cdEl.textContent = 'Match in progress';
+        return;
+      }
+      var h = Math.floor(diff / 3600000);
+      var m = Math.floor((diff % 3600000) / 60000);
+      var s = Math.floor((diff % 60000) / 1000);
+      cdEl.textContent = 'Next Match: ' +
+        (h > 0 ? h + 'h ' : '') +
+        String(m).padStart(2, '0') + 'm ' +
+        String(s).padStart(2, '0') + 's';
+    }
+    tick();
+    setInterval(tick, 1000);
+  }
+})();
+
+(function () {
   if (!{{ (round is not none) | tojson }}) { return; }
 
   // Mirrors the live-poll cadence in app/scheduler.py - no point refreshing faster
@@ -165,6 +192,14 @@
   .players-page {
     color: #e9ecef;
     position: relative;
+  }
+  .match-countdown {
+    text-align: center;
+    color: #ffd166;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.75rem;
   }
   .players-grid-heading {
     color: #fff;
