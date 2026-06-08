@@ -8,8 +8,8 @@
   <div class="card-body">
     {% if round.lock_time %}
       <p class="mb-1">
-        <strong>Locks at {{ round.lock_time.strftime('%a %d %b %Y, %H:%M UTC') }}</strong>
-        <span class="text-muted">(5 minutes before {{ round.earliest_kickoff.strftime('%H:%M UTC') }} kick-off)</span>
+        <strong>Locks at {{ round.lock_time | london('%a %d %b %Y, %H:%M %Z') }}</strong>
+        <span class="text-muted">(5 minutes before {{ round.earliest_kickoff | london('%H:%M %Z') }} kick-off)</span>
       </p>
     {% else %}
       <p class="mb-1 text-muted">Lock time will be set automatically once you assign fixtures &mdash; it's always 5 minutes before the round's earliest kick-off.</p>
@@ -57,8 +57,8 @@
       <tbody>
         {% for fixture in fixtures %}
         <tr>
-          <td><small>{{ fixture.kickoff_at.strftime('%a %d %b %Y') }}</small></td>
-          <td><small>{{ fixture.kickoff_at.strftime('%H:%M UTC') }}</small></td>
+          <td><small>{{ fixture.kickoff_at | london('%a %d %b %Y') }}</small></td>
+          <td><small>{{ fixture.kickoff_at | london('%H:%M %Z') }}</small></td>
           <td>
             {{ fixture.home_team }} v {{ fixture.away_team }}
             {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
@@ -92,8 +92,8 @@
           {% for fixture in unassigned %}
           <tr>
             <td><input type="checkbox" class="form-check-input" name="fixture_ids" value="{{ fixture.id }}"></td>
-            <td><small>{{ fixture.kickoff_at.strftime('%a %d %b %Y') }}</small></td>
-            <td><small>{{ fixture.kickoff_at.strftime('%H:%M UTC') }}</small></td>
+            <td><small>{{ fixture.kickoff_at | london('%a %d %b %Y') }}</small></td>
+            <td><small>{{ fixture.kickoff_at | london('%H:%M %Z') }}</small></td>
             <td>
               {{ fixture.home_team }} v {{ fixture.away_team }}
               <small class="text-muted">{{ fixture.stage }}</small>

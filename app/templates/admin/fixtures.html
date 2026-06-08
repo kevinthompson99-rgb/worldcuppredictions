@@ -15,7 +15,7 @@
       <td>{{ fixture.home_team }} v {{ fixture.away_team }}</td>
       <td><small>{{ fixture.stage }} {% if fixture.group_name %}&middot; {{ fixture.group_name }}{% endif %}</small></td>
       <td>{{ fixture.round.name if fixture.round else '—' }}</td>
-      <td><small>{{ fixture.kickoff_at.strftime('%d %b, %H:%M UTC') }}</small></td>
+      <td><small>{{ fixture.kickoff_at | london('%d %b, %H:%M %Z') }}</small></td>
       <td><small>{{ fixture.status }}</small></td>
       <td colspan="4">
         <form method="post" action="{{ url_for('admin.edit_fixture', fixture_id=fixture.id) }}" class="d-flex gap-2 align-items-center flex-wrap">

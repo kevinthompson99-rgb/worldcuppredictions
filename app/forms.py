@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import IntegerField, PasswordField, StringField, SubmitField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, ValidationError
+from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, ValidationError
+from wtforms.widgets import TextInput
 
 from app.models import User
 
@@ -35,6 +36,20 @@ class LoginForm(FlaskForm):
     submit = SubmitField("Log in")
 
 
+class ScoreField(IntegerField):
+    """An IntegerField rendered as a plain text input (not a number spinner/dropdown).
+
+    `inputmode="numeric"` and `pattern="[0-9]*"` give mobile browsers a numeric keypad
+    and let the browser flag non-digit input client-side, while the server-side
+    validators below are the source of truth.
+    """
+
+    widget = TextInput()
+
+
+SCORE_RANGE_MESSAGE = "Enter a score between 0 and 15."
+
+
 def build_prediction_form(fixtures):
     """Dynamically build a form with a home/away score pair per fixture.
 
@@ -45,17 +60,15 @@ def build_prediction_form(fixtures):
     class PredictionForm(FlaskForm):
         pass
 
+    def make_score_field():
+        return ScoreField(
+            validators=[InputRequired(message=SCORE_RANGE_MESSAGE), NumberRange(min=0, max=15, message=SCORE_RANGE_MESSAGE)],
+            render_kw={"inputmode": "numeric", "pattern": "[0-9]*", "maxlength": "2", "autocomplete": "off"},
+        )
+
     for fixture in fixtures:
-        setattr(
-            PredictionForm,
-            f"home_{fixture.id}",
-            IntegerField(validators=[DataRequired(), NumberRange(min=0, max=20)]),
-        )
-        setattr(
-            PredictionForm,
-            f"away_{fixture.id}",
-            IntegerField(validators=[DataRequired(), NumberRange(min=0, max=20)]),
-        )
+        setattr(PredictionForm, f"home_{fixture.id}", make_score_field())
+        setattr(PredictionForm, f"away_{fixture.id}", make_score_field())
 
     setattr(PredictionForm, "submit", SubmitField("Save predictions"))
     return PredictionForm()

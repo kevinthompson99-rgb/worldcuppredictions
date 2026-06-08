@@ -45,7 +45,6 @@ def round_leaderboard(round_: Round):
         )
         .outerjoin(round_points, round_points.c.user_id == User.id)
         .outerjoin(tournament_points, tournament_points.c.user_id == User.id)
-        .group_by(User.id)
         .order_by(db.desc("round_points"), db.desc("tournament_points"), User.username.asc())
         .all()
     )

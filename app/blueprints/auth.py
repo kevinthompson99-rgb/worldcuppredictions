@@ -11,7 +11,7 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 @bp.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("main.dashboard"))
+        return redirect(url_for("main.players"))
 
     form = RegistrationForm()
     if form.validate_on_submit():
@@ -28,7 +28,7 @@ def register():
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("main.dashboard"))
+        return redirect(url_for("main.players"))
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -37,7 +37,7 @@ def login():
             flash("Invalid email or password.", "danger")
         else:
             login_user(user)
-            return redirect(url_for("main.dashboard"))
+            return redirect(url_for("main.players"))
 
     return render_template("auth/login.html", form=form)
 

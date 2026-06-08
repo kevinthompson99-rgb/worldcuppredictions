@@ -9,14 +9,70 @@ round/fixture management, prediction submission + locking, scoring, and both
 leaderboards are implemented and manually verified end-to-end (register → admin
 creates round → assigns fixture → user predicts → fixture scored → leaderboards update).
 
-Also now wired up: the background polling scheduler (`app/scheduler.py`, see below) —
-live polling during match windows, daily sync otherwise, all logged to `PollLog` and
-visible in the admin panel (`/admin/polling`, plus a "last run" summary on `/admin/`).
+Also wired up: the background polling scheduler (`app/scheduler.py`, see below) — live
+polling during match windows, daily sync otherwise, all logged to `PollLog` and visible
+in the admin panel (`/admin/polling`, plus a "last run" summary on `/admin/`).
 
-**Not yet built** (natural next steps):
+**Built this session:**
+- **Live match scores on the results page** — `main/round_results.html` shows a live
+  `LIVE <minute>'` badge + running score, final score + winner, or "Not started", and
+  auto-refreshes every 3 minutes via `fetch` against the new `main.round_live_scores`
+  JSON endpoint. See [[Live score display]].
+- **Real-time round leaderboard** — `main/round_leaderboard.html` now shows round points
+  *and* tournament total side by side and auto-refreshes the same way, against the new
+  `main.round_leaderboard_live` JSON endpoint and a rewritten `leaderboards.round_leaderboard`
+  that returns both totals per user. See [[Live round leaderboard]].
+- **Switched DB driver from psycopg2 to psycopg v3** (`psycopg[binary]`) to fix a Railway
+  boot crash (`ImportError: libpq.so.5`) — see [[psycopg v3 driver]].
+- **Startup-time migrations + admin seeding fallback** (`app/__init__.py:run_startup_tasks`)
+  to fix two Railway-only bugs (login 500s, a DB error near dashboard loads) both rooted
+  in the same cause: Railway never runs the Procfile's `release:` line. See
+  [[Railway deployment]] for the full story and current status.
+
+## Current Railway deployment status
+
+**As of this session's fixes, NOT yet redeployed/reverified on Railway** — the three
+fixes above (psycopg v3 switch, startup migrations, startup admin seeding) were made in
+response to real errors reported from a live Railway deployment, verified locally
+(SQLite, cold + warm boot, idempotency), but **not yet confirmed against Railway's actual
+Postgres**. Next session should deploy this branch and confirm:
+- App boots without the `libpq.so.5` crash (psycopg v3).
+- Startup logs show migrations applying cleanly against Railway's Postgres (watch for
+  any Postgres-specific migration quirks that don't show up against SQLite).
+- Login works (admin user seeded automatically, no more 500).
+- Dashboard loads without the `relation "fixtures" does not exist` error.
+- The live-poll scheduler runs cleanly once the schema exists (it starts immediately on
+  boot, in-process — see [[Background polling]]).
+
+**Known risk to watch for**: `run_startup_tasks` runs `flask_migrate.upgrade()` on
+*every* boot, in-process, with `--workers 1` (single gunicorn worker, per
+[[Background polling]]'s single-process assumption) — so this should be safe and
+sequential. If web worker count is ever increased, multiple workers racing to run
+migrations on boot would be a real problem; that'd need to move to a proper Railway
+pre-deploy/release-command config (Railway supports this via `railway.json`/`railway.toml`,
+neither of which exists in this repo yet) rather than running at app-boot time.
+
+## Known issues / open questions
+
+- **Railway deploy unverified** (see above) — this is the most important thing to close
+  out next session.
+- **No `railway.json`/`railway.toml`** — Railway doesn't run the Procfile's `release:`
+  line, and the repo has no Railway-native config for a release/pre-deploy step either.
+  The startup-time fallback works around this, but a proper `railway.json` with a
+  `deploy.releaseCommand` would be the more idiomatic fix if/when web workers scale
+  beyond 1.
+- **psycopg v3 switch is locally-verified only** — confirmed the engine resolves to the
+  `psycopg` dialect and the app boots fine against SQLite; not yet run against a real
+  Postgres instance (no local Postgres/Docker available in this environment).
+- **Live "minute" is approximated** (`Fixture.elapsed_minutes`, wall-clock since kickoff,
+  capped at 90) because the free football-data.org tier doesn't reliably expose a live
+  minute field — acceptable per spec but worth knowing if scores look "ahead" of the
+  badge during stoppage time.
+
+**Not yet built** (natural next steps, unchanged from before this session):
 - Styling/UX pass — current templates are functional Bootstrap, not polished.
-- Tests (none yet — verified manually via curl + a Python REPL script during scaffolding).
-- Railway deployment itself (Procfile is written but untested against a real Railway project).
+- Tests (none yet — verified manually via curl + a Python REPL script during scaffolding,
+  and via local SQLite smoke tests for this session's fixes).
 
 ## Background polling — app/scheduler.py
 

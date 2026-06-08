@@ -3,6 +3,7 @@ from flask_login import login_required
 
 from app.admin_utils import admin_required
 from app.extensions import db
+from app.finance import all_rounds_financial_summary
 from app.forms import CSRFForm
 from app.models import (
     ROUND_STATUS_ACTIVE,
@@ -39,6 +40,14 @@ def dashboard():
         user_count=User.query.count(),
         last_poll=PollLog.query.order_by(PollLog.run_at.desc()).first(),
         form=CSRFForm(),
+    )
+
+
+@bp.route("/finance")
+def finance():
+    return render_template(
+        "admin/finance.html",
+        summaries=all_rounds_financial_summary(),
     )
 
 

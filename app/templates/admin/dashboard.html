@@ -18,7 +18,7 @@
           <p class="card-text mb-1"><strong>{{ active_round.name }}</strong> <span class="badge bg-success">ACTIVE</span></p>
           <p class="card-text text-muted mb-2">
             {{ active_round.fixtures.count() }} fixture(s) &middot;
-            {% if active_round.is_locked %}locked, results coming in{% else %}locks at {{ active_round.lock_time.strftime('%a %d %b, %H:%M UTC') }}{% endif %}
+            {% if active_round.is_locked %}locked, results coming in{% else %}locks at {{ active_round.lock_time | london('%a %d %b, %H:%M %Z') }}{% endif %}
           </p>
           <a href="{{ url_for('admin.round_detail', round_id=active_round.id) }}" class="btn btn-sm btn-outline-primary">Manage &raquo;</a>
         {% else %}

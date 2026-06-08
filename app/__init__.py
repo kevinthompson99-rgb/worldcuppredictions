@@ -129,7 +129,30 @@ def register_cli(app):
 
 def register_template_helpers(app):
     from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    UTC = ZoneInfo("UTC")
+    LONDON = ZoneInfo("Europe/London")
 
     @app.context_processor
     def inject_now():
         return {"current_year": datetime.utcnow().year}
+
+    @app.template_filter("gbp")
+    def format_gbp(amount, signed=False):
+        """Render a Decimal/£ amount as e.g. '£5.00' or, when `signed`, '+£5.00'/'-£5.00'."""
+        sign = "-" if amount < 0 else ("+" if signed else "")
+        return f"{sign}£{abs(amount):.2f}"
+
+    @app.template_filter("london")
+    def format_london_time(value, fmt="%a %d %b, %H:%M %Z"):
+        """Render a naive UTC datetime (as stored in the DB) in UK local time.
+
+        Converts via Europe/London so kick-offs display correctly whether the
+        UK is on GMT or BST (e.g. the 2026 World Cup runs during BST) - the
+        `%Z` in the default format then renders the right abbreviation for the
+        date in question, rather than a hard-coded "UTC"/"BST" label.
+        """
+        if value is None:
+            return ""
+        return value.replace(tzinfo=UTC).astimezone(LONDON).strftime(fmt)

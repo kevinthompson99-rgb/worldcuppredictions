@@ -11,7 +11,7 @@
       <td>{{ round.sequence }}</td>
       <td>{{ round.name }}{% if round.description %}<br><small class="text-muted">{{ round.description }}</small>{% endif %}</td>
       <td>{{ round.fixtures.count() }}</td>
-      <td>{{ round.lock_time.strftime('%a %d %b, %H:%M UTC') if round.lock_time else '—' }}</td>
+      <td>{{ round.lock_time | london('%a %d %b, %H:%M %Z') if round.lock_time else '—' }}</td>
       <td>
         {% if round.status == 'DRAFT' %}<span class="badge bg-secondary">Draft</span>
         {% elif round.status == 'ACTIVE' %}

@@ -188,6 +188,33 @@ class Fixture(db.Model):
         return f"<Fixture {self.home_team} v {self.away_team} @ {self.kickoff_at}>"
 
 
+class RoundEntry(db.Model):
+    """A user's opt-in/out decision for a round's £5 pot (see app/finance.py).
+
+    Opting in is financial only - it doesn't gate prediction *visibility*, but the app
+    only lets opted-in users submit predictions and only shows opted-in users in the
+    players grid. A row is created on the user's first toggle and then flipped in place,
+    so `opted_in` always reflects their latest choice (allowed any time up to lock).
+    """
+
+    __tablename__ = "round_entries"
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "round_id", name="uq_round_entry_user_round"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False, index=True)
+    opted_in = db.Column(db.Boolean, nullable=False, default=False)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship("User", backref=db.backref("round_entries", lazy="dynamic"))
+    round = db.relationship("Round", backref=db.backref("entries", lazy="dynamic"))
+
+    def __repr__(self):
+        return f"<RoundEntry user={self.user_id} round={self.round_id} opted_in={self.opted_in}>"
+
+
 class Prediction(db.Model):
     __tablename__ = "predictions"
     __table_args__ = (
