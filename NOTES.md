@@ -140,6 +140,17 @@ as `round_results`) every 3 minutes via `fetch` to refresh scores in place witho
 full reload — matching the scheduler's live-poll cadence (app/scheduler.py), with a
 visible note that scores can run up to ~10 minutes behind real time as a result.
 
+### Live round leaderboard — main.round_leaderboard_view / round_leaderboard_live
+`app/leaderboards.round_leaderboard` returns `(user, round_points, tournament_points)`
+rather than just round points — showing both side by side lets a user see, as results
+land mid-round, both how this round is going *and* where it leaves them overall, without
+a separate lookup. The page (`main/round_leaderboard.html`) auto-refreshes via the same
+`fetch`-every-3-minutes pattern as the live score feed (`main.round_leaderboard_live`,
+[[Live score display]]), rebuilding the table in place from JSON so points update as
+fixtures finish and `score_fixture` reruns — no manual reload needed. If the active round
+itself changes between polls (archived/published mid-session), the refresh is a no-op and
+a future full page load picks up the new round, rather than splicing mismatched data in.
+
 ### Password hashing
 Explicitly set to `pbkdf2:sha256` in `User.set_password` — werkzeug's default (`scrypt`)
 needs `hashlib.scrypt`, which isn't available on every Python build (hit this locally

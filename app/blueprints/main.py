@@ -41,6 +41,32 @@ def round_leaderboard_view():
     return render_template("main/round_leaderboard.html", round=round_, rows=rows)
 
 
+@bp.route("/leaderboard/round/live")
+@login_required
+def round_leaderboard_live():
+    """JSON feed of round/tournament points, polled by the leaderboard's auto-refresh.
+
+    As fixtures finish and get (re)scored - including mid-round, while other matches are
+    still live - this lets the standings update in place on the same 3-minute cadence as
+    the live score feed (main.round_live_scores), without a manual page reload.
+    """
+    round_ = get_round_for_leaderboard()
+    rows = round_leaderboard(round_) if round_ is not None else []
+
+    return jsonify(
+        round_id=round_.id if round_ is not None else None,
+        rows=[
+            {
+                "user_id": user.id,
+                "username": user.username,
+                "round_points": round_points,
+                "tournament_points": tournament_points,
+            }
+            for user, round_points, tournament_points in rows
+        ],
+    )
+
+
 @bp.route("/leaderboard/tournament")
 @login_required
 def tournament_leaderboard_view():

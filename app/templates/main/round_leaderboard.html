@@ -1,22 +1,88 @@
 {% extends "base.html" %}
 {% block title %}Round leaderboard{% endblock %}
 {% block content %}
-<h1 class="mb-4">Round leaderboard</h1>
+<h1 class="mb-1">Round leaderboard</h1>
 {% if round %}
-  <p class="text-muted">{{ round.name }}</p>
-  <table class="table table-striped">
-    <thead><tr><th>#</th><th>Player</th><th>Points</th></tr></thead>
+  <p class="text-muted mb-1">{{ round.name }}</p>
+  <p class="text-muted small mb-4">
+    <em>Updates automatically every 3 minutes as match results are confirmed and
+    predictions are rescored - no need to refresh.</em>
+  </p>
+  <table class="table table-striped" id="round-leaderboard-table">
+    <thead><tr><th>#</th><th>Player</th><th>Round points</th><th>Tournament total</th></tr></thead>
     <tbody>
-      {% for user, points in rows %}
-      <tr {% if user.id == current_user.id %}class="table-primary"{% endif %}>
-        <td>{{ loop.index }}</td>
+      {% for user, round_points, tournament_points in rows %}
+      <tr data-user-id="{{ user.id }}" {% if user.id == current_user.id %}class="table-primary"{% endif %}>
+        <td class="js-rank">{{ loop.index }}</td>
         <td>{{ user.username }}</td>
-        <td>{{ points }}</td>
+        <td class="js-round-points">{{ round_points }}</td>
+        <td class="js-tournament-points">{{ tournament_points }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   <a href="{{ url_for('main.round_results', round_id=round.id) }}" class="btn btn-outline-secondary btn-sm">View predictions vs results</a>
+
+  <script>
+  (function () {
+    // Same cadence as the live-score refresh on the results page (app/scheduler.py
+    // polls results at most every 3 minutes, so refreshing faster gains nothing).
+    var REFRESH_MS = 3 * 60 * 1000;
+    var endpoint = {{ url_for('main.round_leaderboard_live') | tojson }};
+    var currentUserId = {{ current_user.id | tojson }};
+    var tbody = document.querySelector('#round-leaderboard-table tbody');
+
+    function buildRow(row, rank) {
+      var tr = document.createElement('tr');
+      tr.setAttribute('data-user-id', row.user_id);
+      if (row.user_id === currentUserId) {
+        tr.className = 'table-primary';
+      }
+
+      var rankCell = document.createElement('td');
+      rankCell.className = 'js-rank';
+      rankCell.textContent = rank;
+
+      var nameCell = document.createElement('td');
+      nameCell.textContent = row.username;
+
+      var roundCell = document.createElement('td');
+      roundCell.className = 'js-round-points';
+      roundCell.textContent = row.round_points;
+
+      var tournamentCell = document.createElement('td');
+      tournamentCell.className = 'js-tournament-points';
+      tournamentCell.textContent = row.tournament_points;
+
+      tr.appendChild(rankCell);
+      tr.appendChild(nameCell);
+      tr.appendChild(roundCell);
+      tr.appendChild(tournamentCell);
+      return tr;
+    }
+
+    function refresh() {
+      fetch(endpoint, { headers: { 'Accept': 'application/json' } })
+        .then(function (response) { return response.ok ? response.json() : Promise.reject(response.status); })
+        .then(function (data) {
+          // The active round can change between polls (e.g. it gets archived and the
+          // next one published) - if so, leave the table alone and let the next full
+          // page load pick up the new round rather than splicing mismatched data in.
+          if (!tbody || data.round_id !== {{ round.id | tojson }}) {
+            return;
+          }
+          var rows = data.rows || [];
+          tbody.innerHTML = '';
+          rows.forEach(function (row, index) {
+            tbody.appendChild(buildRow(row, index + 1));
+          });
+        })
+        .catch(function () { /* transient failure - we'll retry on the next tick */ });
+    }
+
+    setInterval(refresh, REFRESH_MS);
+  })();
+  </script>
 {% else %}
   <p class="text-muted">No round has started yet.</p>
 {% endif %}
