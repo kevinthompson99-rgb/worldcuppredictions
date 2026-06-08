@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from app.admin_utils import admin_required
 from app.extensions import db
 from app.finance import all_rounds_financial_summary
-from app.forms import AdminCreateUserForm, CSRFForm
+from app.forms import AdminCreateUserForm, AdminEditUserForm, CSRFForm
 from app.models import (
     DEFAULT_STAKE_AMOUNT,
     ROUND_STATUS_ACTIVE,
@@ -362,6 +362,22 @@ def create_user():
         for error in field.errors:
             flash(error, "danger")
     return redirect(url_for("admin.users"))
+
+
+@bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
+def edit_user(user_id):
+    user = User.query.get_or_404(user_id)
+    form = AdminEditUserForm(user_id=user.id, obj=user)
+    if form.validate_on_submit():
+        user.username = form.username.data.strip()
+        user.display_name = form.display_name.data.strip()
+        if form.password.data:
+            user.set_password(form.password.data)
+        user.is_admin = form.is_admin.data
+        db.session.commit()
+        flash(f"Saved changes to '{user.display_name}'.", "success")
+        return redirect(url_for("admin.edit_user", user_id=user.id))
+    return render_template("admin/user_detail.html", user=user, form=form, delete_form=CSRFForm())
 
 
 @bp.route("/users/<int:user_id>/delete", methods=["POST"])

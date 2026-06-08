@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ user.display_name }}{% endblock %}
+{% block content %}
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <a href="{{ url_for('admin.users') }}" class="btn btn-sm btn-outline-secondary mb-3">&larr; Users</a>
+  <h1 class="mb-1">{{ user.display_name }}</h1>
+  <p class="text-muted small mb-4">
+    #{{ user.id }} &middot;
+    Joined {{ user.created_at.strftime('%d %b %Y') }}
+    {% if user.email %}&middot; {{ user.email }}{% endif %}
+  </p>
+
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.display_name.label(class_="form-label") }}
+      {{ form.display_name(class_="form-control") }}
+      {% for error in form.display_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="mb-3">
+      {{ form.username.label(class_="form-label") }}
+      {{ form.username(class_="form-control") }}
+      <div class="form-text">Private &mdash; used only to log in, not shown to other players.</div>
+      {% for error in form.username.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="mb-3">
+      {{ form.password.label(class_="form-label") }}
+      {{ form.password(class_="form-control", autocomplete="new-password") }}
+      <div class="form-text">Leave blank to keep the existing password.</div>
+      {% for error in form.password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="form-check mb-4">
+      {{ form.is_admin(class_="form-check-input") }}
+      {{ form.is_admin.label(class_="form-check-label") }}
+    </div>
+    {{ form.submit(class_="btn btn-primary") }}
+  </form>
+
+  {% if user.id != current_user.id %}
+  <hr class="my-4">
+  <h5 class="text-danger">Danger zone</h5>
+  <p class="text-muted small">Deletes the account and all their predictions and round entries.</p>
+  <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}"
+        onsubmit="return confirm('Delete {{ user.display_name }}? This cannot be undone.');">
+    {{ delete_form.hidden_tag() }}
+    <button type="submit" class="btn btn-sm btn-danger">Delete this user</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

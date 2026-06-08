@@ -3,10 +3,6 @@
 {% block body_class %}players-body{% endblock %}
 {% block content %}
 <div class="players-page">
-  {% if current_user.is_admin %}
-    <a href="{{ url_for('admin.dashboard') }}" class="admin-cog" title="Admin">&#9881;&#65039;</a>
-  {% endif %}
-
   {% if round is none %}
     <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
   {% else %}
@@ -169,14 +165,6 @@
   .players-page {
     color: #e9ecef;
     position: relative;
-  }
-  .admin-cog {
-    position: absolute;
-    top: 0;
-    right: 0;
-    font-size: 1.3rem;
-    text-decoration: none;
-    line-height: 1;
   }
   .players-grid-heading {
     color: #fff;

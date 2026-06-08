@@ -3,58 +3,72 @@
 {% block content %}
 {% include "admin/_mobile.html" %}
 <div class="admin-page">
-  <h1 class="mb-4">Users</h1>
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <h1 class="mb-0">Users</h1>
+    <button class="btn btn-sm btn-primary ms-auto" type="button"
+            data-bs-toggle="collapse" data-bs-target="#add-user-form" aria-expanded="false">
+      Add user
+    </button>
+  </div>
 
-  <div class="card mb-4">
-    <div class="card-body">
-      <h5 class="card-title">Add a user</h5>
-      <form method="post" action="{{ url_for('admin.create_user') }}" novalidate>
-        {{ create_form.hidden_tag() }}
-        <div class="mb-3">
-          {{ create_form.username.label(class_="form-label") }}
-          {{ create_form.username(class_="form-control") }}
-        </div>
-        <div class="mb-3">
-          {{ create_form.display_name.label(class_="form-label") }}
-          {{ create_form.display_name(class_="form-control") }}
-        </div>
-        <div class="mb-3">
-          {{ create_form.password.label(class_="form-label") }}
-          {{ create_form.password(class_="form-control") }}
-        </div>
-        <div class="form-check mb-3">
-          {{ create_form.is_admin(class_="form-check-input") }}
-          {{ create_form.is_admin.label(class_="form-check-label") }}
-        </div>
-        {{ create_form.submit(class_="btn btn-primary") }}
-      </form>
+  <div class="collapse mb-4" id="add-user-form">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Add a user</h5>
+        <form method="post" action="{{ url_for('admin.create_user') }}" novalidate>
+          {{ create_form.hidden_tag() }}
+          <div class="mb-3">
+            {{ create_form.username.label(class_="form-label") }}
+            {{ create_form.username(class_="form-control") }}
+          </div>
+          <div class="mb-3">
+            {{ create_form.display_name.label(class_="form-label") }}
+            {{ create_form.display_name(class_="form-control") }}
+          </div>
+          <div class="mb-3">
+            {{ create_form.password.label(class_="form-label") }}
+            {{ create_form.password(class_="form-control") }}
+          </div>
+          <div class="form-check mb-3">
+            {{ create_form.is_admin(class_="form-check-input") }}
+            {{ create_form.is_admin.label(class_="form-check-label") }}
+          </div>
+          {{ create_form.submit(class_="btn btn-primary") }}
+        </form>
+      </div>
     </div>
   </div>
 
   <ul class="admin-list">
     {% for user in users %}
     <li class="admin-row">
-      <div class="admin-row-head">
-        <span>#{{ user.id }} &middot; {{ user.display_name }}</span>
-        {% if user.is_admin %}<span class="badge bg-primary">Admin</span>{% endif %}
-      </div>
-      <div class="admin-row-meta">
-        <span>Username: {{ user.username }}</span>
-        <span>{{ user.email or 'no email' }}</span>
-        <span>Joined {{ user.created_at.strftime('%d %b %Y') }}</span>
-      </div>
-      {% if user.id != current_user.id %}
-      <div class="admin-row-actions">
-        <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" onsubmit="return confirm('Delete user {{ user.username }}? This cannot be undone.');">
-          {{ delete_form.hidden_tag() }}
-          <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-        </form>
-      </div>
-      {% endif %}
+      <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" class="admin-row-link">
+        <div class="admin-row-head">
+          <span>{{ user.display_name }}</span>
+          {% if user.is_admin %}<span class="badge bg-primary">Admin</span>{% endif %}
+          {% if user.id == current_user.id %}<span class="badge bg-secondary">You</span>{% endif %}
+        </div>
+        <div class="admin-row-meta">
+          <span>{{ user.username }}</span>
+          <span>Joined {{ user.created_at.strftime('%d %b %Y') }}</span>
+        </div>
+      </a>
     </li>
     {% else %}
     <li class="admin-empty">No users yet.</li>
     {% endfor %}
   </ul>
 </div>
+
+<style>
+  .admin-row-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+  .admin-row-link:hover .admin-row-head {
+    color: #0d6efd;
+  }
+  .admin-row { cursor: pointer; }
+</style>
 {% endblock %}

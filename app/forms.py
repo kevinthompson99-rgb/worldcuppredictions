@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, IntegerField, PasswordField, StringField, SubmitField
-from wtforms.validators import DataRequired, EqualTo, InputRequired, Length, NumberRange, ValidationError
+from wtforms.validators import DataRequired, EqualTo, InputRequired, Length, NumberRange, Optional, ValidationError
 from wtforms.widgets import TextInput
 
 from app.models import User
@@ -33,6 +33,25 @@ class AdminCreateUserForm(FlaskForm):
 
     def validate_username(self, field):
         if User.query.filter_by(username=field.data).first():
+            raise ValidationError("That username is already taken.")
+
+
+class AdminEditUserForm(FlaskForm):
+    """Edit an existing user's identity and permissions from the admin panel."""
+
+    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=64)])
+    display_name = StringField("Display name", validators=[DataRequired(), Length(min=1, max=64)])
+    password = PasswordField("New password", validators=[Optional(), Length(min=8)])
+    is_admin = BooleanField("Admin")
+    submit = SubmitField("Save changes")
+
+    def __init__(self, user_id, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._user_id = user_id
+
+    def validate_username(self, field):
+        existing = User.query.filter_by(username=field.data).first()
+        if existing and existing.id != self._user_id:
             raise ValidationError("That username is already taken.")
 
 
