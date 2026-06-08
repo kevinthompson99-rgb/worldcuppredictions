@@ -2,9 +2,19 @@ import os
 
 
 def _normalize_db_url(url: str) -> str:
-    """Railway/Heroku-style URLs use postgres://, SQLAlchemy needs postgresql://."""
+    """Normalize Railway/Heroku-style URLs for SQLAlchemy + psycopg v3.
+
+    Those platforms hand out `postgres://...` URLs, but SQLAlchemy requires the
+    `postgresql://` scheme. We also pin the driver to `+psycopg` (psycopg v3, installed
+    as `psycopg[binary]`) explicitly - the bare `postgresql://` scheme resolves to
+    psycopg2 by default, which fails on Railway with `ImportError: libpq.so.5: cannot
+    open shared object file` because it dynamically links against a system libpq that
+    isn't present in the runtime image. psycopg v3's binary wheel bundles libpq instead.
+    """
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql://", 1)
+        url = url.replace("postgres://", "postgresql://", 1)
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     return url
 
 
