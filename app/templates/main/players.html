@@ -3,13 +3,13 @@
 {% block body_class %}players-body{% endblock %}
 {% block content %}
 <div class="players-page">
-  {% if next_kickoff %}
-    <div id="js-countdown" class="match-countdown" data-kickoff="{{ next_kickoff }}"></div>
-  {% endif %}
-
   {% if round is none %}
     <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
   {% else %}
+
+    {% if next_kickoff %}
+      <div id="js-countdown" class="match-countdown" data-kickoff="{{ next_kickoff }}"></div>
+    {% endif %}
 
     {# ---- Round info, pot & opt-in ---- #}
     <div class="round-card">
@@ -121,16 +121,16 @@
         cdEl.textContent = 'Match in progress';
         return;
       }
-      var h = Math.floor(diff / 3600000);
+      var d = Math.floor(diff / 86400000);
+      var h = Math.floor((diff % 86400000) / 3600000);
       var m = Math.floor((diff % 3600000) / 60000);
-      var s = Math.floor((diff % 60000) / 1000);
       cdEl.textContent = 'Next Match: ' +
-        (h > 0 ? h + 'h ' : '') +
-        String(m).padStart(2, '0') + 'm ' +
-        String(s).padStart(2, '0') + 's';
+        (d > 0 ? d + 'd ' : '') +
+        String(h).padStart(2, '0') + 'h ' +
+        String(m).padStart(2, '0') + 'm';
     }
     tick();
-    setInterval(tick, 1000);
+    setInterval(tick, 60000);
   }
 })();
 
