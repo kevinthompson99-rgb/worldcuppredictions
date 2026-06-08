@@ -1,63 +1,75 @@
 {% extends "base.html" %}
 {% block title %}Manage rounds{% endblock %}
 {% block content %}
-<h1 class="mb-4">Rounds</h1>
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <h1 class="mb-4">Rounds</h1>
 
-<table class="table table-striped mb-4">
-  <thead><tr><th>#</th><th>Name</th><th>Fixtures</th><th>Locks at</th><th>Status</th><th></th></tr></thead>
-  <tbody>
+  <ul class="admin-list">
     {% for round in rounds %}
-    <tr>
-      <td>{{ round.sequence }}</td>
-      <td>{{ round.name }}{% if round.description %}<br><small class="text-muted">{{ round.description }}</small>{% endif %}</td>
-      <td>{{ round.fixtures.count() }}</td>
-      <td>{{ round.lock_time | london('%a %d %b, %H:%M %Z') if round.lock_time else '—' }}</td>
-      <td>
+    <li class="admin-row">
+      <div class="admin-row-head">
+        <span>#{{ round.sequence }} &middot; {{ round.name }}</span>
         {% if round.status == 'DRAFT' %}<span class="badge bg-secondary">Draft</span>
         {% elif round.status == 'ACTIVE' %}
-          {% if round.is_locked %}<span class="badge bg-info text-dark">Active &mdash; locked, in progress</span>
-          {% else %}<span class="badge bg-success">Active &mdash; open for predictions</span>
+          {% if round.is_locked %}<span class="badge bg-info text-dark">Active &mdash; locked</span>
+          {% else %}<span class="badge bg-success">Active &mdash; open</span>
           {% endif %}
-        {% else %}<span class="badge bg-dark">Complete &amp; archived</span>
+        {% else %}<span class="badge bg-dark">Complete</span>
         {% endif %}
-      </td>
-      <td><a href="{{ url_for('admin.round_detail', round_id=round.id) }}" class="btn btn-sm btn-outline-primary">Manage fixtures</a></td>
-    </tr>
+      </div>
+      {% if round.description %}<div class="admin-row-body text-muted">{{ round.description }}</div>{% endif %}
+      <div class="admin-row-meta">
+        <span>{{ round.fixtures.count() }} fixture{{ '' if round.fixtures.count() == 1 else 's' }}</span>
+        <span>Stake {{ round.stake_amount | gbp }}</span>
+        <span>Locks {{ round.lock_time | london('%a %d %b, %H:%M %Z') if round.lock_time else '—' }}</span>
+      </div>
+      <div class="admin-row-actions">
+        <a href="{{ url_for('admin.round_detail', round_id=round.id) }}" class="btn btn-sm btn-outline-primary">Manage fixtures</a>
+      </div>
+    </li>
     {% else %}
-    <tr><td colspan="6" class="text-muted">No rounds yet.</td></tr>
+    <li class="admin-empty">No rounds yet.</li>
     {% endfor %}
-  </tbody>
-</table>
+  </ul>
 
-{% if can_create_draft %}
-<div class="card" style="max-width: 30rem;">
-  <div class="card-body">
-    <h5 class="card-title">Prepare the next round</h5>
-    <p class="card-text text-muted small">
-      Created as a draft &mdash; invisible to users until you publish it. You can prepare it
-      now even while another round is still active.
-    </p>
-    <form method="post" action="{{ url_for('admin.create_round') }}">
-      {{ form.hidden_tag() }}
-      <div class="mb-3">
-        <label class="form-label">Name</label>
-        <input type="text" name="name" class="form-control" placeholder="e.g. Group Stage Week 1" required>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Description <span class="text-muted">(optional)</span></label>
-        <textarea name="description" class="form-control" rows="2" placeholder="e.g. Matches 1-16, 11-15 June"></textarea>
-      </div>
-      <button type="submit" class="btn btn-primary">Create draft round</button>
-    </form>
+  {% if can_create_draft %}
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Prepare the next round</h5>
+      <p class="card-text text-muted small">
+        Created as a draft &mdash; invisible to users until you publish it. You can prepare it
+        now even while another round is still active.
+      </p>
+      <form method="post" action="{{ url_for('admin.create_round') }}">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. Group Stage Week 1" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description <span class="text-muted">(optional)</span></label>
+          <textarea name="description" class="form-control" rows="2" placeholder="e.g. Matches 1-16, 11-15 June"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Stake per player <span class="text-muted">(optional &mdash; defaults to £5.00)</span></label>
+          <div class="input-group" style="max-width: 10rem;">
+            <span class="input-group-text">£</span>
+            <input type="text" inputmode="decimal" name="stake_amount" class="form-control" placeholder="5.00">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Create draft round</button>
+      </form>
+    </div>
   </div>
+  {% else %}
+  <div class="alert alert-info">
+    There's already a draft round being prepared &mdash; finish populating and publish it
+    before creating another.
+    {% for round in rounds if round.status == 'DRAFT' %}
+      <br><a href="{{ url_for('admin.round_detail', round_id=round.id) }}">Manage {{ round.name }} &raquo;</a>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
-{% else %}
-<div class="alert alert-info" style="max-width: 40rem;">
-  There's already a draft round being prepared &mdash; finish populating and publish it
-  before creating another.
-  {% for round in rounds if round.status == 'DRAFT' %}
-    <a href="{{ url_for('admin.round_detail', round_id=round.id) }}">Manage {{ round.name }} &raquo;</a>
-  {% endfor %}
-</div>
-{% endif %}
 {% endblock %}

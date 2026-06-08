@@ -1,52 +1,52 @@
 {% extends "base.html" %}
 {% block title %}Pot &amp; finances{% endblock %}
 {% block content %}
-<h1 class="mb-1">Pot &amp; finances</h1>
-<p class="text-muted mb-4">
-  Per-round opt-in pots and settlements &mdash; £5 a head, winner(s) take the pot, everyone else loses their stake.
-  Nothing here moves real money; it's tracked for reference and settled externally between players.
-</p>
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <h1 class="mb-1">Pot &amp; finances</h1>
+  <p class="text-muted mb-4">
+    Per-round opt-in pots and settlements &mdash; £5 a head, winner(s) take the pot, everyone else loses their stake.
+    Nothing here moves real money; it's tracked for reference and settled externally between players.
+  </p>
 
-{% for round_, summary in summaries %}
-  <div class="card bg-dark text-light mb-3">
-    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span>
-        <strong>{{ round_.name }}</strong>
-        <span class="badge bg-{{ 'success' if round_.status == 'COMPLETE' else ('info text-dark' if round_.status == 'ACTIVE' else 'secondary') }} ms-2">{{ round_.status }}</span>
-      </span>
-      <span class="text-muted small">
-        {{ summary.entrant_count }} opted in &middot; pot {{ summary.pot | gbp }}
-        {% if not summary.settled %}&middot; <span class="badge bg-warning text-dark">awaiting results</span>{% endif %}
-      </span>
-    </div>
-    {% if summary.rows %}
-      <table class="table table-sm table-dark table-striped mb-0">
-        <thead><tr><th>#</th><th>Player</th><th>Round pts</th><th>Result</th></tr></thead>
-        <tbody>
+  {% for round_, summary in summaries %}
+    <div class="card bg-dark text-light mb-3">
+      <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>
+          <strong>{{ round_.name }}</strong>
+          <span class="badge bg-{{ 'success' if round_.status == 'COMPLETE' else ('info text-dark' if round_.status == 'ACTIVE' else 'secondary') }} ms-2">{{ round_.status }}</span>
+        </span>
+        <span class="text-muted small">
+          {{ summary.entrant_count }} opted in &middot; pot {{ summary.pot | gbp }}
+          {% if not summary.settled %}&middot; <span class="badge bg-warning text-dark">awaiting results</span>{% endif %}
+        </span>
+      </div>
+      {% if summary.rows %}
+        <ul class="list-group list-group-flush">
           {% for row in summary.rows %}
-            <tr>
-              <td>{{ loop.index }}</td>
-              <td>
+            <li class="list-group-item bg-dark text-light d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+              <span>
+                <span class="text-muted small">#{{ loop.index }}</span>
                 {{ row.user.username }}
                 {% if row.is_winner %}<span class="badge bg-warning text-dark">winner</span>{% endif %}
-              </td>
-              <td>{{ row.round_points }}</td>
-              <td class="{{ 'text-success' if row.financial_result and row.financial_result > 0 else ('text-danger' if row.financial_result and row.financial_result < 0 else 'text-muted') }}">
+                <span class="text-muted small ms-1">{{ row.round_points }} pt{{ '' if row.round_points == 1 else 's' }}</span>
+              </span>
+              <span class="{{ 'text-success' if row.financial_result and row.financial_result > 0 else ('text-danger' if row.financial_result and row.financial_result < 0 else 'text-muted') }}">
                 {% if row.financial_result is none %}
                   pending
                 {% else %}
                   {{ row.financial_result | gbp(signed=True) }}
                 {% endif %}
-              </td>
-            </tr>
+              </span>
+            </li>
           {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <div class="card-body text-muted">No one opted in to this round.</div>
-    {% endif %}
-  </div>
-{% else %}
-  <p class="text-muted">No rounds have been created yet.</p>
-{% endfor %}
+        </ul>
+      {% else %}
+        <div class="card-body text-muted">No one opted in to this round.</div>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="text-muted">No rounds have been created yet.</p>
+  {% endfor %}
+</div>
 {% endblock %}

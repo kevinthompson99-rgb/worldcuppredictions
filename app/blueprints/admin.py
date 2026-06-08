@@ -1,3 +1,5 @@
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
@@ -6,14 +8,13 @@ from app.extensions import db
 from app.finance import all_rounds_financial_summary
 from app.forms import AdminCreateUserForm, CSRFForm
 from app.models import (
+    DEFAULT_STAKE_AMOUNT,
     ROUND_STATUS_ACTIVE,
     ROUND_STATUS_COMPLETE,
     ROUND_STATUS_DRAFT,
     Fixture,
     PollLog,
-    Prediction,
     Round,
-    RoundEntry,
     User,
 )
 from app.round_helpers import get_active_round, get_draft_round
@@ -132,9 +133,28 @@ def create_round():
         flash("A round name is required.", "danger")
         return redirect(url_for("admin.rounds"))
 
+    stake_raw = request.form.get("stake_amount", "").strip()
+    if stake_raw:
+        try:
+            stake_amount = Decimal(stake_raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        except InvalidOperation:
+            flash("Stake must be a valid amount, e.g. 5.00.", "danger")
+            return redirect(url_for("admin.rounds"))
+        if stake_amount <= 0:
+            flash("Stake must be greater than zero.", "danger")
+            return redirect(url_for("admin.rounds"))
+    else:
+        stake_amount = DEFAULT_STAKE_AMOUNT
+
     latest = Round.query.order_by(Round.sequence.desc()).first()
     next_sequence = (latest.sequence + 1) if latest else 1
-    round_ = Round(name=name, description=description or None, sequence=next_sequence, status=ROUND_STATUS_DRAFT)
+    round_ = Round(
+        name=name,
+        description=description or None,
+        sequence=next_sequence,
+        stake_amount=stake_amount,
+        status=ROUND_STATUS_DRAFT,
+    )
     db.session.add(round_)
     db.session.commit()
     flash(f"Draft round '{name}' created - assign its fixtures, then publish it when you're ready.", "success")
@@ -263,12 +283,12 @@ def unassign_fixture(fixture_id):
 
     if round_ is not None and round_.is_locked:
         flash("This round has already locked - fixtures can no longer be removed from it.", "danger")
-        return redirect(request.referrer or url_for("admin.round_detail", round_id=round_id))
+        return redirect(url_for("admin.round_detail", round_id=round_id))
 
     fixture.round_id = None
     db.session.commit()
     flash(f"Removed {fixture.home_team} v {fixture.away_team} from {round_.name if round_ else 'its round'}.", "info")
-    return redirect(request.referrer or url_for("admin.round_detail", round_id=round_id))
+    return redirect(url_for("admin.round_detail", round_id=round_id))
 
 
 @bp.route("/fixtures")
@@ -310,7 +330,7 @@ def edit_fixture(fixture_id):
     db.session.commit()
 
     flash(f"Fixture updated and {updated} prediction(s) (re)scored.", "success")
-    return redirect(request.referrer or url_for("admin.fixtures"))
+    return redirect(url_for("admin.fixtures"))
 
 
 @bp.route("/users")
@@ -329,7 +349,7 @@ def create_user():
     if form.validate_on_submit():
         user = User(
             username=form.username.data.strip(),
-            email=form.email.data.lower().strip(),
+            display_name=form.display_name.data.strip(),
             is_admin=form.is_admin.data,
         )
         user.set_password(form.password.data)
@@ -356,19 +376,11 @@ def delete_user(user_id):
         flash("You can't delete your own account.", "danger")
         return redirect(url_for("admin.users"))
 
-    has_activity = (
-        Prediction.query.filter_by(user_id=user.id).first() is not None
-        or RoundEntry.query.filter_by(user_id=user.id).first() is not None
-    )
-    if has_activity:
-        flash(
-            f"Can't delete '{user.username}' - they've already made predictions or joined a round's "
-            "pot, and removing them would corrupt that history.",
-            "danger",
-        )
-        return redirect(url_for("admin.users"))
-
+    username = user.username
+    # Cascade (User.predictions / RoundEntry.user, see models.py) takes their
+    # predictions, round entries and opt-ins with them, so they also vanish
+    # immediately from the players grid, standings and pot calculations.
     db.session.delete(user)
     db.session.commit()
-    flash(f"Deleted user '{user.username}'.", "info")
+    flash(f"Deleted user '{username}' and all their predictions/round entries.", "info")
     return redirect(url_for("admin.users"))

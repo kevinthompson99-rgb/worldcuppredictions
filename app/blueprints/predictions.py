@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.finance import STAKE_AMOUNT, is_opted_in
+from app.finance import is_opted_in
 from app.forms import build_prediction_form
 from app.models import Prediction
 from app.round_helpers import get_active_round
@@ -29,7 +29,7 @@ def my_predictions():
         return render_template("predictions/edit.html", round=round_, fixtures=fixtures, locked=locked, opted_in=opted_in, form=None)
 
     if not opted_in:
-        flash(f"Join this round (£{STAKE_AMOUNT:.2f}) on the home screen before entering predictions.", "warning")
+        flash(f"Join this round (£{round_.stake_amount:.2f}) on the home screen before entering predictions.", "warning")
         return redirect(url_for("main.players"))
 
     predictions = {

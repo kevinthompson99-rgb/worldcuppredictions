@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -22,18 +23,32 @@ ROUND_STATUSES = (ROUND_STATUS_DRAFT, ROUND_STATUS_ACTIVE, ROUND_STATUS_COMPLETE
 
 PREDICTION_LOCK_MINUTES_BEFORE_KICKOFF = 5
 
+# Used as the round's stake when the admin doesn't set one explicitly when creating it.
+DEFAULT_STAKE_AMOUNT = Decimal("5.00")
+
 
 class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    # The public-facing name shown in the players grid, leaderboard, and pot/finance
+    # views — kept separate from `username` so the login identity stays private.
+    # Set at registration (or by the admin when creating an account) and editable
+    # any time via auth.profile.
+    display_name = db.Column(db.String(64), nullable=False)
+    # Optional and unconstrained — only the seeded admin account has one (see
+    # app/__init__.py:_seed_admin); regular sign-up only collects username/password.
+    email = db.Column(db.String(120), unique=False, nullable=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-    predictions = db.relationship("Prediction", back_populates="user", lazy="dynamic")
+    # cascade="all, delete-orphan": deleting a user (admin.delete_user) must take
+    # their predictions and round entries (opt-ins included - opted_in lives on
+    # RoundEntry) with them, or the delete fails on the FK / leaves orphans that
+    # keep them showing up in the players grid and standings.
+    predictions = db.relationship("Prediction", back_populates="user", lazy="dynamic", cascade="all, delete-orphan")
 
     def set_password(self, password: str) -> None:
         # Explicit method: some platforms' Python builds lack hashlib.scrypt (werkzeug's default).
@@ -56,6 +71,9 @@ class Round(db.Model):
     # Auto-assigned as (previous round's sequence + 1) when a draft is created - rounds
     # are always prepared and played in order, even if drafted ahead of time.
     sequence = db.Column(db.Integer, unique=True, nullable=False)
+    # Per-round buy-in - sized for GBP to the penny. Set by the admin when creating the
+    # round (see admin.create_round); defaults to DEFAULT_STAKE_AMOUNT when left blank.
+    stake_amount = db.Column(db.Numeric(8, 2), nullable=False, default=DEFAULT_STAKE_AMOUNT)
     status = db.Column(db.String(16), nullable=False, default=ROUND_STATUS_DRAFT, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -208,7 +226,7 @@ class RoundEntry(db.Model):
     opted_in = db.Column(db.Boolean, nullable=False, default=False)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user = db.relationship("User", backref=db.backref("round_entries", lazy="dynamic"))
+    user = db.relationship("User", backref=db.backref("round_entries", lazy="dynamic", cascade="all, delete-orphan"))
     round = db.relationship("Round", backref=db.backref("entries", lazy="dynamic"))
 
     def __repr__(self):

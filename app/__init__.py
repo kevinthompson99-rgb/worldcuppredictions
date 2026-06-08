@@ -87,10 +87,12 @@ def _seed_admin(app):
     user = User.query.filter_by(email=email.lower()).first()
     created = user is None
     if user is None:
-        user = User(username=username, email=email.lower())
+        user = User(username=username, display_name=username, email=email.lower())
         db.session.add(user)
 
     user.username = username
+    if not user.display_name:
+        user.display_name = username
     user.is_admin = True
     user.set_password(password)
     db.session.commit()

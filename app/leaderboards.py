@@ -45,7 +45,7 @@ def round_leaderboard(round_: Round):
         )
         .outerjoin(round_points, round_points.c.user_id == User.id)
         .outerjoin(tournament_points, tournament_points.c.user_id == User.id)
-        .order_by(db.desc("round_points"), db.desc("tournament_points"), User.username.asc())
+        .order_by(db.desc("round_points"), db.desc("tournament_points"), User.display_name.asc())
         .all()
     )
     return rows
@@ -57,7 +57,7 @@ def tournament_standings():
         db.session.query(User, func.coalesce(func.sum(Prediction.points), 0).label("points"))
         .outerjoin(Prediction, Prediction.user_id == User.id)
         .group_by(User.id)
-        .order_by(db.desc("points"), User.username.asc())
+        .order_by(db.desc("points"), User.display_name.asc())
         .all()
     )
     return rows

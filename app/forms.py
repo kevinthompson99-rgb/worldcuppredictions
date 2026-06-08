@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, IntegerField, PasswordField, StringField, SubmitField
-from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, ValidationError
+from wtforms.validators import DataRequired, EqualTo, InputRequired, Length, NumberRange, ValidationError
 from wtforms.widgets import TextInput
 
 from app.models import User
@@ -8,7 +8,11 @@ from app.models import User
 
 class RegistrationForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired(), Length(min=3, max=64)])
-    email = StringField("Email", validators=[DataRequired(), Email(), Length(max=120)])
+    display_name = StringField(
+        "Display name",
+        validators=[DataRequired(), Length(min=1, max=64)],
+        description="Shown to other players in the grid, leaderboard and pot — your username stays private.",
+    )
     password = PasswordField("Password", validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField(
         "Confirm password", validators=[DataRequired(), EqualTo("password", message="Passwords must match")]
@@ -19,14 +23,10 @@ class RegistrationForm(FlaskForm):
         if User.query.filter_by(username=field.data).first():
             raise ValidationError("That username is already taken.")
 
-    def validate_email(self, field):
-        if User.query.filter_by(email=field.data.lower()).first():
-            raise ValidationError("That email is already registered.")
-
 
 class AdminCreateUserForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired(), Length(min=3, max=64)])
-    email = StringField("Email", validators=[DataRequired(), Email(), Length(max=120)])
+    display_name = StringField("Display name", validators=[DataRequired(), Length(min=1, max=64)])
     password = PasswordField("Password", validators=[DataRequired(), Length(min=8)])
     is_admin = BooleanField("Admin")
     submit = SubmitField("Add user")
@@ -35,9 +35,13 @@ class AdminCreateUserForm(FlaskForm):
         if User.query.filter_by(username=field.data).first():
             raise ValidationError("That username is already taken.")
 
-    def validate_email(self, field):
-        if User.query.filter_by(email=field.data.lower()).first():
-            raise ValidationError("That email is already registered.")
+
+class ProfileForm(FlaskForm):
+    """Lets a player change the public-facing name shown on the grid/leaderboard/pot
+    without touching their (private) login username."""
+
+    display_name = StringField("Display name", validators=[DataRequired(), Length(min=1, max=64)])
+    submit = SubmitField("Save")
 
 
 class CSRFForm(FlaskForm):
@@ -47,7 +51,7 @@ class CSRFForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    email = StringField("Email", validators=[DataRequired(), Email()])
+    username = StringField("Username", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])
     submit = SubmitField("Log in")
 

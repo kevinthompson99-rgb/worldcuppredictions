@@ -1,54 +1,60 @@
 {% extends "base.html" %}
 {% block title %}Users{% endblock %}
 {% block content %}
-<h1 class="mb-4">Users</h1>
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <h1 class="mb-4">Users</h1>
 
-<div class="card mb-4" style="max-width: 32rem;">
-  <div class="card-body">
-    <h5 class="card-title">Add a user</h5>
-    <form method="post" action="{{ url_for('admin.create_user') }}" novalidate>
-      {{ create_form.hidden_tag() }}
-      <div class="mb-3">
-        {{ create_form.username.label(class_="form-label") }}
-        {{ create_form.username(class_="form-control") }}
-      </div>
-      <div class="mb-3">
-        {{ create_form.email.label(class_="form-label") }}
-        {{ create_form.email(class_="form-control") }}
-      </div>
-      <div class="mb-3">
-        {{ create_form.password.label(class_="form-label") }}
-        {{ create_form.password(class_="form-control") }}
-      </div>
-      <div class="form-check mb-3">
-        {{ create_form.is_admin(class_="form-check-input") }}
-        {{ create_form.is_admin.label(class_="form-check-label") }}
-      </div>
-      {{ create_form.submit(class_="btn btn-primary") }}
-    </form>
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Add a user</h5>
+      <form method="post" action="{{ url_for('admin.create_user') }}" novalidate>
+        {{ create_form.hidden_tag() }}
+        <div class="mb-3">
+          {{ create_form.username.label(class_="form-label") }}
+          {{ create_form.username(class_="form-control") }}
+        </div>
+        <div class="mb-3">
+          {{ create_form.display_name.label(class_="form-label") }}
+          {{ create_form.display_name(class_="form-control") }}
+        </div>
+        <div class="mb-3">
+          {{ create_form.password.label(class_="form-label") }}
+          {{ create_form.password(class_="form-control") }}
+        </div>
+        <div class="form-check mb-3">
+          {{ create_form.is_admin(class_="form-check-input") }}
+          {{ create_form.is_admin.label(class_="form-check-label") }}
+        </div>
+        {{ create_form.submit(class_="btn btn-primary") }}
+      </form>
+    </div>
   </div>
-</div>
 
-<table class="table table-striped">
-  <thead><tr><th>#</th><th>Username</th><th>Email</th><th>Admin?</th><th>Joined</th><th></th></tr></thead>
-  <tbody>
+  <ul class="admin-list">
     {% for user in users %}
-    <tr>
-      <td>{{ user.id }}</td>
-      <td>{{ user.username }}</td>
-      <td>{{ user.email }}</td>
-      <td>{% if user.is_admin %}<span class="badge bg-primary">Admin</span>{% endif %}</td>
-      <td>{{ user.created_at.strftime('%d %b %Y') }}</td>
-      <td>
-        {% if user.id != current_user.id %}
+    <li class="admin-row">
+      <div class="admin-row-head">
+        <span>#{{ user.id }} &middot; {{ user.display_name }}</span>
+        {% if user.is_admin %}<span class="badge bg-primary">Admin</span>{% endif %}
+      </div>
+      <div class="admin-row-meta">
+        <span>Username: {{ user.username }}</span>
+        <span>{{ user.email or 'no email' }}</span>
+        <span>Joined {{ user.created_at.strftime('%d %b %Y') }}</span>
+      </div>
+      {% if user.id != current_user.id %}
+      <div class="admin-row-actions">
         <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" onsubmit="return confirm('Delete user {{ user.username }}? This cannot be undone.');">
           {{ delete_form.hidden_tag() }}
           <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
         </form>
-        {% endif %}
-      </td>
-    </tr>
+      </div>
+      {% endif %}
+    </li>
+    {% else %}
+    <li class="admin-empty">No users yet.</li>
     {% endfor %}
-  </tbody>
-</table>
+  </ul>
+</div>
 {% endblock %}

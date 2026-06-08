@@ -1,11 +1,10 @@
 from datetime import datetime
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.finance import (
-    STAKE_AMOUNT,
     is_opted_in,
     round_financial_summary,
     round_pot,
@@ -28,7 +27,7 @@ _AVATAR_COLORS = (
 
 
 def _avatar(user):
-    initials = user.username[:2].upper() if len(user.username) > 1 else user.username[:1].upper()
+    initials = user.display_name[:2].upper() if len(user.display_name) > 1 else user.display_name[:1].upper()
     return {"initials": initials, "color": _AVATAR_COLORS[user.id % len(_AVATAR_COLORS)]}
 
 
@@ -61,6 +60,16 @@ def _cell(user, prediction, fixture, locked, is_me):
     return {"user_id": user.id, "fixture_id": fixture.id, "prediction": prediction, "status": status}
 
 
+@bp.route("/sw.js")
+def service_worker():
+    """Serve the service worker from the root so its scope covers the whole app
+    — registering it from /static/sw.js would limit it to the /static/ path.
+    """
+    response = current_app.send_static_file("sw.js")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @bp.route("/")
 def index():
     if current_user.is_authenticated:
@@ -88,7 +97,7 @@ def players():
     users = []
     if round_ is not None:
         entrant_ids = {entry.user_id for entry in round_.entries.filter_by(opted_in=True)}
-        users = [user for user in User.query.order_by(User.username.asc()).all() if user.id in entrant_ids]
+        users = [user for user in User.query.order_by(User.display_name.asc()).all() if user.id in entrant_ids]
 
     predictions = {}
     if fixtures:
@@ -113,6 +122,7 @@ def players():
         "main/players.html",
         round=round_,
         users=users,
+        total_users=User.query.count(),
         grid=grid,
         locked=locked,
         avatars={user.id: _avatar(user) for user in users},
@@ -120,8 +130,8 @@ def players():
         opted_in=opted_in,
         opt_in_open=opt_in_open,
         opt_in_form=opt_in_form,
-        stake_amount=STAKE_AMOUNT,
-        pot=round_pot(len(users)) if round_ is not None else None,
+        stake_amount=round_.stake_amount if round_ is not None else None,
+        pot=round_pot(len(users), round_.stake_amount) if round_ is not None else None,
     )
 
 
@@ -153,7 +163,7 @@ def round_opt_in():
 
     entry.updated_at = datetime.utcnow()
     db.session.commit()
-    flash(f"You're in! £{STAKE_AMOUNT:.2f} added to the pot for {round_.name}.", "success")
+    flash(f"You're in! £{round_.stake_amount:.2f} added to the pot for {round_.name}.", "success")
     return redirect(url_for("main.players"))
 
 

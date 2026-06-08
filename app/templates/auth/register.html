@@ -12,9 +12,10 @@
         {% for error in form.username.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
       </div>
       <div class="mb-3">
-        {{ form.email.label(class_="form-label") }}
-        {{ form.email(class_="form-control") }}
-        {% for error in form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        {{ form.display_name.label(class_="form-label") }}
+        {{ form.display_name(class_="form-control") }}
+        <div class="form-text">{{ form.display_name.description }}</div>
+        {% for error in form.display_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
       </div>
       <div class="mb-3">
         {{ form.password.label(class_="form-label") }}

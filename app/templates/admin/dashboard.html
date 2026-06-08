@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Admin{% endblock %}
 {% block content %}
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
 <h1 class="mb-4">Admin</h1>
 
-<div class="row g-3 mb-4">
-  <div class="col-md-3"><div class="card text-center"><div class="card-body"><h2>{{ round_count }}</h2><p class="text-muted mb-0">Rounds</p></div></div></div>
-  <div class="col-md-3"><div class="card text-center"><div class="card-body"><h2>{{ fixture_count }}</h2><p class="text-muted mb-0">Fixtures ({{ unassigned_count }} unassigned)</p></div></div></div>
-  <div class="col-md-3"><div class="card text-center"><div class="card-body"><h2>{{ user_count }}</h2><p class="text-muted mb-0">Users</p></div></div></div>
+<div class="row g-2 g-md-3 mb-4">
+  <div class="col-6 col-md-3"><div class="card text-center"><div class="card-body py-2 py-md-3"><h2 class="mb-0">{{ round_count }}</h2><p class="text-muted mb-0 small">Rounds</p></div></div></div>
+  <div class="col-6 col-md-3"><div class="card text-center"><div class="card-body py-2 py-md-3"><h2 class="mb-0">{{ fixture_count }}</h2><p class="text-muted mb-0 small">Fixtures ({{ unassigned_count }} unassigned)</p></div></div></div>
+  <div class="col-6 col-md-3"><div class="card text-center"><div class="card-body py-2 py-md-3"><h2 class="mb-0">{{ user_count }}</h2><p class="text-muted mb-0 small">Users</p></div></div></div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -45,14 +47,14 @@
   </div>
 </div>
 
-<div class="d-flex gap-2 mb-4">
-  <a href="{{ url_for('admin.rounds') }}" class="btn btn-primary">Manage rounds</a>
-  <a href="{{ url_for('admin.fixtures') }}" class="btn btn-outline-secondary">All fixtures</a>
-  <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary">Users</a>
-  <a href="{{ url_for('admin.polling') }}" class="btn btn-outline-secondary">Polling activity</a>
-  <form method="post" action="{{ url_for('admin.trigger_sync') }}" class="ms-auto">
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a href="{{ url_for('admin.rounds') }}" class="btn btn-sm btn-primary">Manage rounds</a>
+  <a href="{{ url_for('admin.fixtures') }}" class="btn btn-sm btn-outline-secondary">All fixtures</a>
+  <a href="{{ url_for('admin.users') }}" class="btn btn-sm btn-outline-secondary">Users</a>
+  <a href="{{ url_for('admin.polling') }}" class="btn btn-sm btn-outline-secondary">Polling activity</a>
+  <form method="post" action="{{ url_for('admin.trigger_sync') }}" class="d-inline">
     {{ form.hidden_tag() }}
-    <button type="submit" class="btn btn-success">Sync fixtures &amp; results now</button>
+    <button type="submit" class="btn btn-sm btn-success">Sync fixtures &amp; results now</button>
   </form>
 </div>
 
@@ -84,4 +86,5 @@
   use "Manage rounds" to curate which matches belong to each round (essential for the
   knockout stage, where matchups are only known once earlier rounds finish).
 </p>
+</div>
 {% endblock %}

@@ -1,45 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Fixtures{% endblock %}
 {% block content %}
-<h1 class="mb-4">All fixtures</h1>
-<p class="text-muted">
-  Edit the 90-minute score / winner here if a knockout match went to extra time or
-  penalties &mdash; the synced score may include ET goals, which predictions should not be judged against.
-</p>
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <h1 class="mb-4">All fixtures</h1>
+  <p class="text-muted">
+    Edit the 90-minute score / winner here if a knockout match went to extra time or
+    penalties &mdash; the synced score may include ET goals, which predictions should not be judged against.
+  </p>
 
-<table class="table table-sm align-middle">
-  <thead><tr><th>Match</th><th>Stage</th><th>Round</th><th>Kick-off</th><th>Status</th><th>90-min score</th><th>Winner</th><th>Knockout?</th><th></th></tr></thead>
-  <tbody>
+  <ul class="admin-list">
     {% for fixture in fixtures %}
-    <tr>
-      <td>{{ fixture.home_team | flag }} {{ fixture.home_team }} v {{ fixture.away_team }} {{ fixture.away_team | flag }}</td>
-      <td><small>{{ fixture.stage }} {% if fixture.group_name %}&middot; {{ fixture.group_name }}{% endif %}</small></td>
-      <td>{{ fixture.round.name if fixture.round else '—' }}</td>
-      <td><small>{{ fixture.kickoff_at | london('%d %b, %H:%M %Z') }}</small></td>
-      <td><small>{{ fixture.status }}</small></td>
-      <td colspan="4">
-        <form method="post" action="{{ url_for('admin.edit_fixture', fixture_id=fixture.id) }}" class="d-flex gap-2 align-items-center flex-wrap">
-          {{ form.hidden_tag() }}
-          <input type="number" name="home_score_90" class="form-control form-control-sm" style="width: 4.5rem;" value="{{ fixture.home_score_90 if fixture.home_score_90 is not none else '' }}" min="0">
+    <li class="admin-row">
+      <div class="admin-row-head">
+        <span>{{ fixture.home_team | flag }} {{ fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_team }} {{ fixture.away_team | flag }}</span>
+        {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
+      </div>
+      <div class="admin-row-meta">
+        <span>{{ fixture.stage }}{% if fixture.group_name %} &middot; {{ fixture.group_name }}{% endif %}</span>
+        <span>{{ fixture.round.name if fixture.round else 'unassigned' }}</span>
+        <span>{{ fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}</span>
+        <span>{{ fixture.status }}</span>
+      </div>
+      <form method="post" action="{{ url_for('admin.edit_fixture', fixture_id=fixture.id) }}" class="d-flex gap-2 align-items-center flex-wrap admin-row-actions">
+        {{ form.hidden_tag() }}
+        <span class="d-inline-flex align-items-center gap-1">
+          <input type="number" name="home_score_90" class="form-control form-control-sm" style="width: 4rem;" value="{{ fixture.home_score_90 if fixture.home_score_90 is not none else '' }}" min="0" aria-label="Home score (90 min)">
           <span>&ndash;</span>
-          <input type="number" name="away_score_90" class="form-control form-control-sm" style="width: 4.5rem;" value="{{ fixture.away_score_90 if fixture.away_score_90 is not none else '' }}" min="0">
-          <select name="winner" class="form-select form-select-sm" style="width: 8rem;">
-            <option value="">winner…</option>
-            <option value="HOME" {{ 'selected' if fixture.winner == 'HOME' }}>{{ fixture.home_team | flag }} {{ fixture.home_team }}</option>
-            <option value="AWAY" {{ 'selected' if fixture.winner == 'AWAY' }}>{{ fixture.away_team | flag }} {{ fixture.away_team }}</option>
-            <option value="DRAW" {{ 'selected' if fixture.winner == 'DRAW' }}>Draw</option>
-          </select>
-          <div class="form-check">
-            <input type="checkbox" name="is_knockout" class="form-check-input" id="ko-{{ fixture.id }}" {{ 'checked' if fixture.is_knockout }}>
-            <label class="form-check-label" for="ko-{{ fixture.id }}">knockout</label>
-          </div>
-          <button type="submit" class="btn btn-sm btn-outline-primary">Save &amp; rescore</button>
-        </form>
-      </td>
-    </tr>
+          <input type="number" name="away_score_90" class="form-control form-control-sm" style="width: 4rem;" value="{{ fixture.away_score_90 if fixture.away_score_90 is not none else '' }}" min="0" aria-label="Away score (90 min)">
+        </span>
+        <select name="winner" class="form-select form-select-sm" style="width: auto; max-width: 9rem;" aria-label="Winner">
+          <option value="">winner…</option>
+          <option value="HOME" {{ 'selected' if fixture.winner == 'HOME' }}>{{ fixture.home_team | flag }} {{ fixture.home_team }}</option>
+          <option value="AWAY" {{ 'selected' if fixture.winner == 'AWAY' }}>{{ fixture.away_team | flag }} {{ fixture.away_team }}</option>
+          <option value="DRAW" {{ 'selected' if fixture.winner == 'DRAW' }}>Draw</option>
+        </select>
+        <div class="form-check">
+          <input type="checkbox" name="is_knockout" class="form-check-input" id="ko-{{ fixture.id }}" {{ 'checked' if fixture.is_knockout }}>
+          <label class="form-check-label" for="ko-{{ fixture.id }}">knockout</label>
+        </div>
+        <button type="submit" class="btn btn-sm btn-outline-primary">Save &amp; rescore</button>
+      </form>
+    </li>
     {% else %}
-    <tr><td colspan="9" class="text-muted">No fixtures yet. Try syncing from the admin dashboard.</td></tr>
+    <li class="admin-empty">No fixtures yet. Try syncing from the admin dashboard.</li>
     {% endfor %}
-  </tbody>
-</table>
+  </ul>
+</div>
 {% endblock %}

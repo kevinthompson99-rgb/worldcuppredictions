@@ -11,9 +11,7 @@ behind. No real money moves; this is for reference, settled externally between p
 from decimal import ROUND_HALF_UP, Decimal
 
 from app.leaderboards import round_leaderboard, tournament_standings
-from app.models import Round, RoundEntry
-
-STAKE_AMOUNT = Decimal("5.00")
+from app.models import DEFAULT_STAKE_AMOUNT, Round, RoundEntry
 
 
 def opted_in_user_ids(round_):
@@ -29,8 +27,8 @@ def is_opted_in(user, round_):
     return bool(entry and entry.opted_in)
 
 
-def round_pot(entrant_count):
-    return STAKE_AMOUNT * entrant_count
+def round_pot(entrant_count, stake=DEFAULT_STAKE_AMOUNT):
+    return stake * entrant_count
 
 
 def _split_pot(pot, num_winners):
@@ -52,8 +50,9 @@ def round_financial_summary(round_):
     (their winnings minus the stake they put in) and everyone else nets `-stake` -
     these always sum to zero across the entrant pool.
     """
+    stake = round_.stake_amount
     entrant_ids = opted_in_user_ids(round_)
-    pot = round_pot(len(entrant_ids))
+    pot = round_pot(len(entrant_ids), stake)
     settled = round_.all_fixtures_settled
 
     rows = []
@@ -72,9 +71,9 @@ def round_financial_summary(round_):
             if not settled:
                 financial_result = None
             elif is_winner:
-                financial_result = share - STAKE_AMOUNT
+                financial_result = share - stake
             else:
-                financial_result = -STAKE_AMOUNT
+                financial_result = -stake
 
             rows.append({
                 "user": user,
@@ -85,7 +84,7 @@ def round_financial_summary(round_):
 
     return {
         "pot": pot,
-        "stake": STAKE_AMOUNT,
+        "stake": stake,
         "entrant_count": len(entrant_ids),
         "settled": settled,
         "rows": rows,

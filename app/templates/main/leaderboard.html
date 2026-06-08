@@ -28,7 +28,7 @@
               {% for row in financial_summary.rows %}
                 <tr class="{{ 'is-me' if row.user.id == current_user.id }}{{ ' is-winner' if row.is_winner }}">
                   <td>{{ loop.index }}</td>
-                  <td>{{ row.user.username }}{% if row.is_winner %} <span class="winner-star" title="Round winner">&#9733;</span>{% endif %}</td>
+                  <td>{{ row.user.display_name }}{% if row.is_winner %} <span class="winner-star" title="Round winner">&#9733;</span>{% endif %}</td>
                   <td>{{ row.round_points }}</td>
                   <td class="financial-cell{{ ' is-positive' if row.financial_result and row.financial_result > 0 }}{{ ' is-negative' if row.financial_result and row.financial_result < 0 }}">
                     {% if row.financial_result is none %}
@@ -59,7 +59,7 @@
             {% for user, points, balance in season_financial_rows %}
               <tr class="{{ 'is-me' if user.id == current_user.id }}">
                 <td>{{ loop.index }}</td>
-                <td>{{ user.username }}</td>
+                <td>{{ user.display_name }}</td>
                 <td>{{ points }}</td>
                 <td class="financial-cell{{ ' is-positive' if balance > 0 }}{{ ' is-negative' if balance < 0 }}">{{ balance | gbp(signed=True) }}</td>
               </tr>

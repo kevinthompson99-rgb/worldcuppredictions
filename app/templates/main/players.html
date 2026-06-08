@@ -6,7 +6,6 @@
   {% if current_user.is_admin %}
     <a href="{{ url_for('admin.dashboard') }}" class="admin-cog" title="Admin">&#9881;&#65039;</a>
   {% endif %}
-  <h1 class="players-h1">Players</h1>
 
   {% if round is none %}
     <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
@@ -24,7 +23,6 @@
       {% endif %}
       <div class="round-card-pot">
         <span class="pot-amount">Pot: {{ pot | gbp }}</span>
-        <span class="pot-detail">{{ users|length }} player{{ '' if users|length == 1 else 's' }} in &middot; {{ stake_amount | gbp }} stake each</span>
       </div>
       {% if opt_in_open and opt_in_form %}
         <form method="post" action="{{ url_for('main.round_opt_in') }}" class="opt-in-form">
@@ -57,14 +55,16 @@
         </p>
       {% endif %}
 
+      <div class="players-grid-heading">{{ users|length }}/{{ total_users }} Players</div>
+
       <div class="players-grid-wrap" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
         <table class="players-grid">
           <thead>
             <tr>
-              <th class="corner-cell">Fixture</th>
+              <th class="corner-cell">Fixtures</th>
               {% for user in users %}
                 <th class="user-cell{{ ' is-me' if user.id == current_user.id }}">
-                  <span class="user-name">{{ user.username }}</span>
+                  <span class="user-name">{{ user.display_name }}</span>
                   <span class="avatar-orbit">
                     <span class="avatar" style="background-color: {{ avatars[user.id].color }};">{{ avatars[user.id].initials }}</span>
                     <span class="points-moon" title="{{ totals.get(user.id, 0) }} points">{{ totals.get(user.id, 0) }}</span>
@@ -178,10 +178,11 @@
     text-decoration: none;
     line-height: 1;
   }
-  .players-h1 {
+  .players-grid-heading {
     color: #fff;
-    font-size: 1.4rem;
-    margin-bottom: 0.75rem;
+    font-weight: 700;
+    font-size: 1rem;
+    margin: 1rem 0 0.5rem;
   }
   .players-subtitle, .players-muted, .players-hint {
     color: #9aa3ad;

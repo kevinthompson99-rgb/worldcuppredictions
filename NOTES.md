@@ -14,6 +14,46 @@ polling during match windows, daily sync otherwise, all logged to `PollLog` and 
 in the admin panel (`/admin/polling`, plus a "last run" summary on `/admin/`).
 
 **Built this session:**
+- **Deleting a user now cascades and disappears them from the players grid
+  immediately.** `admin.delete_user` previously *blocked* deletion outright if the
+  user had any predictions/round entries; it now lets the delete go through and
+  `cascade="all, delete-orphan"` on `User.predictions`/`User.round_entries`
+  (`app/models.py`) takes their predictions, round entries and pot opt-ins with
+  them in one transaction - closing the gap where a deleted user could keep
+  showing up in `/players` (built from `RoundEntry.opted_in` rows). See
+  [[Admin auth]].
+- **Display names, separate from (private) login usernames.** `User.display_name`
+  (required, set at registration or admin creation, editable any time via the new
+  `/auth/profile` page) is now what's shown everywhere another player can see you —
+  players grid, leaderboard, pot/finance rows, avatars, navbar — while `username`
+  reverts to being purely a login credential. See [[Display names]].
+- **Per-round configurable stake.** `Round.stake_amount` (admin-set when creating a
+  round, defaulting to £5.00 if left blank) replaces the old hardcoded `STAKE_AMOUNT`
+  everywhere pot/settlement figures are calculated (`app/finance.py`,
+  `main.round_opt_in`, `predictions.my_predictions`). See [[Per-round stake]].
+- **Home screen polish**: "Fixture" → "Fixtures" column header; dropped the standalone
+  "Players" `<h1>` and the "N players in · £5.00 stake each" line (the pot amount
+  alone says enough), and added a "X/N Players" line directly above the grid showing
+  how many of the app's registered users have opted in to the live round.
+- **Admin section is now fully mobile/PWA-compatible — no more breaking out to Safari.**
+  Every admin page (dashboard, rounds, round detail, fixtures, users, polling,
+  finance) was rebuilt around a shared `admin/_mobile.html` card-list layout
+  (`.admin-page`/`.admin-list`/`.admin-row`) replacing wide multi-column
+  `<table>`s, eliminating horizontal scroll on iPhone. The actual cause of the
+  standalone-mode "pop out to Safari" bug turned out to be an open-redirect
+  pattern (`redirect(request.referrer or url_for(...))`) in three `admin.py`
+  routes — removed in favour of plain `url_for(...)` redirects, which is both
+  the fix and a security hardening (closes a client-controlled redirect vector).
+  See [[Admin mobile layout]].
+- **Username-only sign-up/login — email is now admin-seed-only.** Registration and
+  the admin's "add user" form collect just username + password; `User.email` is now
+  nullable/non-unique and `NULL` for everyone but the seeded admin, and login
+  switched from email to username accordingly. See [[Admin auth]].
+- **Redesigned the PWA app icons** as a classic black-and-white hex-panel football
+  (axial hex grid, dark "pentagon" cells picked by the `(q - r) % 3 == 0` residue
+  rule that keeps them mutually non-adjacent — the defining trait of a real
+  truncated icosahedron), generated as SVG polygons and rasterized to PNG by the
+  same hand-rolled renderer as before. See [[PWA support]].
 - **Navigation redesign, round 2 — Home is the hub, no persistent nav.** Split the
   players home screen into Home / My predictions / Leaderboard (a follow-up to the
   previous session's split, which had added a fixed bottom tile bar — removed again
@@ -29,6 +69,9 @@ in the admin panel (`/admin/polling`, plus a "last run" summary on `/admin/`).
   `.points-moon` in `main/players.html`), replacing the separate "N pts" pill
   stacked below - more compact, reads as one unit per player. See
   [[Navigation redesign]] and [[Team flags]].
+- **Full PWA support** — installable on iOS via Safari "Add to Home Screen", with
+  an app shell cached for offline use and an "update available" banner that
+  appears automatically on deploy. See [[PWA support]].
 - **Admin user management** — `/admin/users` can now create and delete accounts
   directly (with an "Admin" checkbox), rather than requiring hand-edits to the DB
   to promote additional admins. See [[Admin auth]].
@@ -278,6 +321,87 @@ fixtures sync in**, since the UEFA play-off path wasn't finalised as of this
 session's knowledge cutoff and football-data.org's exact naming (short vs. long
 form, diacritics) is unconfirmed against the live feed.
 
+### PWA support — app/static/{manifest.json,sw.js,icons/}, app/blueprints/main.py
+Installable as a standalone app (no browser chrome) via iOS Safari's "Add to
+Home Screen", and works offline for the cached shell:
+- **`app/static/manifest.json`** — name "World Cup Predictions" / short name
+  "WC Predictions", `display: "standalone"`, `start_url: "/"`, dark
+  `background_color`/`theme_color` (`#121417`, matching the grid/players dark
+  theme), and 192×192 / 512×512 icons (`maskable` so iOS/Android can crop to
+  their own shape). The icons (`app/static/icons/icon-{192,512}.png`, plus
+  `icon.svg` kept alongside as the editable source) are a classic black-and-white
+  hex-panel football, generated by `scripts/gen_icons.py`. No SVG/raster toolchain
+  exists in this env (no Pillow, cairosvg, rsvg-convert, Inkscape, ImageMagick,
+  headless Chrome...), so the script builds the ball as actual SVG polygon geometry
+  and rasterizes that *same* shape list to PNG with a tiny hand-rolled renderer
+  (point-in-polygon fill + a minimal PNG encoder over zlib/struct) — SVG and PNG
+  are two views of one set of polygons, not drawn independently. The dark/light
+  panel layout comes from a pointy-top hex grid where axial cells satisfying
+  `(q - r) % 3 == 0` are filled dark: that residue rule is what gives a real
+  truncated icosahedron its defining property (no two dark panels ever touch,
+  each fully ringed by light ones), so it reproduces the classic ball look without
+  hand-placing 32 panels. Re-run the script if the glyph ever needs to change —
+  there's no separate source image to hand-edit beyond the generated `icon.svg`.
+- **`base.html`** links the manifest, sets `theme-color`, and adds the
+  `apple-mobile-web-app-*` meta tags + `apple-touch-icon` Safari needs to treat
+  the home-screen launch as a standalone app rather than a bookmark.
+- **Service worker** (`app/static/sw.js`, served at `/sw.js` — not
+  `/static/sw.js` — via `main.service_worker` so its scope covers the whole
+  app, not just `/static/`) caches the shell (`/`, manifest, icons) on install,
+  serves pages network-first-falling-back-to-cache (so logged-in players still
+  see live scores when online, but get *something* offline), and static assets
+  cache-first. Bumping `CACHE_NAME` in `sw.js` is what makes a deploy "visible"
+  to the browser — any byte change to the file triggers the update flow below.
+- **"Update available" banner** (`#pwa-update-banner` + inline script in
+  `base.html`) — the standard waiting-worker pattern: a new service worker
+  installs alongside the active one and sits in `waiting` rather than taking
+  over immediately (so mid-session users aren't yanked onto a new version);
+  the page detects this via `registration.installing`'s `statechange` →
+  `installed` (with an existing `controller`, i.e. this is an update, not a
+  first install) and shows the banner. Clicking **Refresh** posts
+  `{type: "SKIP_WAITING"}` to the waiting worker, which calls `self.skipWaiting()`;
+  the resulting `controllerchange` event reloads the page once, now served by
+  the new version. Dismissing just hides the banner for this session — it'll
+  reappear on the next load until the user refreshes.
+
+### Admin mobile layout — app/templates/admin/{_mobile.html,*.html}, app/blueprints/admin.py
+Audited every admin page for iPhone/PWA compatibility — no horizontal scrolling,
+compact and readable on a small screen, and (critically) staying inside the
+installed standalone shell rather than popping out to Safari:
+- **`admin/_mobile.html`** is a small CSS partial `{% include %}`'d at the top of
+  every admin template. It defines a shared card-list vocabulary —
+  `.admin-page` (capped width), `.admin-list`/`.admin-row` (a flex column of
+  bordered cards replacing `<table>` rows), `.admin-row-head`/`-meta`/`-body`/
+  `-actions` (sub-regions within a card), and `.admin-empty` — plus a blanket
+  `.admin-page, .admin-page * { min-width: 0; overflow-wrap: anywhere; }` guard
+  so no cell content (long usernames, team names, log details...) can ever force
+  the page wider than the viewport.
+- **Every admin page rebuilt on this vocabulary**, replacing wide multi-column
+  `<table>`s with one `.admin-row` per record: `users.html`, `rounds.html`,
+  `round_detail.html` (both the assigned-fixtures list and the unassigned
+  checkbox-select list, the latter using `<label>`-wrapped checkboxes for
+  easy tapping), `fixtures.html` (header line + meta line + inline edit form
+  per fixture), and `polling.html`. `dashboard.html` keeps its existing card
+  layout but switches the stat row to `col-6 col-md-3` (two-up on phones) and
+  the action buttons to `flex-wrap` + `btn-sm`. `finance.html` keeps its
+  per-round dark cards but swaps the embedded `table-dark table-striped` for a
+  `list-group list-group-flush` of compact rows.
+- **Found and fixed the actual cause of admin pages "breaking out of the PWA"**:
+  three routes in `admin.py` (`unassign_fixture` ×2, `edit_fixture`) redirected
+  via `redirect(request.referrer or url_for(...))`. `request.referrer` is a
+  client-supplied absolute URL — besides being an open-redirect vector in its
+  own right, a referrer whose origin/scheme doesn't exactly match the installed
+  PWA's registered scope is what makes iOS standalone mode kick the navigation
+  out to Safari. Replaced all three with plain `redirect(url_for(...))`, which
+  is always same-origin/relative and both closes the security hole and keeps
+  the whole admin section inside the shell. Confirmed via grep that no
+  `request.referrer` usage remains anywhere in `app/`.
+- **Made the service worker's root scope explicit** — `navigator.serviceWorker
+  .register("/sw.js", { scope: "/" })` in `base.html` — so it's unambiguous that
+  `/admin/*` (and every other route) is handled by the worker, not just whatever
+  page the user happens to land on first. (It was already covered implicitly,
+  since `/sw.js` defaults to scope `/`, but explicit beats implicit here.)
+
 ### Password hashing
 Explicitly set to `pbkdf2:sha256` in `User.set_password` — werkzeug's default (`scrypt`)
 needs `hashlib.scrypt`, which isn't available on every Python build (hit this locally
@@ -288,15 +412,62 @@ Not a separate `Admin` model — `User.is_admin` boolean. The single superuser i
 provisioned/promoted via `flask seed-admin`, which reads `ADMIN_USERNAME`/`ADMIN_EMAIL`/
 `ADMIN_PASSWORD` env vars (wired into the Railway `release` step in the Procfile).
 
+**Email is now admin-seed-only.** Sign-up/login and `AdminCreateUserForm` collect
+just username + password — `User.email` (`app/models.py`) is nullable and
+non-unique (migration `4361e0a4c373_make_user_email_optional`, downgrades back to
+`NOT NULL UNIQUE` if ever needed), and stays `NULL` for everyone except the seeded
+admin, whose email is set/looked-up by `_seed_admin` (still keyed on `ADMIN_EMAIL`
+for idempotent upserts — that's the one place email still matters). Because of this,
+**login switched from email to username** (`LoginForm`/`auth.login` in
+`app/forms.py`/`app/blueprints/auth.py`) — there'd be no way for a regular user to
+log in by email once they no longer have one. The seeded admin logs in by username
+too now (e.g. `admin`, not `admin@example.com`).
+
 `/admin/users` now also has its own add/delete UI (`admin.create_user`/`admin.delete_user`,
 `AdminCreateUserForm` in `app/forms.py`) — the admin can create accounts directly
 (with an optional "Admin" checkbox, so promoting additional admins no longer needs
-hand-editing the DB) and remove ones that were created in error. **Deletion is
-deliberately conservative**: blocked entirely if the user has ever made a prediction
-or joined a round's pot (`Prediction`/`RoundEntry` rows would otherwise dangle or, if
-cascaded, silently rewrite leaderboard/financial history), and an admin can't delete
-their own account. This covers the realistic case (cleaning up a mistyped signup)
-without opening the door to corrupting settled-round history.
+hand-editing the DB) and remove ones that were created in error (an admin can't delete
+their own account). **Deletion now cascades**: `User.predictions` and the
+`User.round_entries` backref (`app/models.py`) both carry `cascade="all,
+delete-orphan"`, so removing a user takes their predictions, round entries *and*
+opt-ins with them in one transaction — they disappear immediately from the players
+grid (built from `RoundEntry.opted_in` rows), standings and pot calculations, with
+no dangling rows or orphaned FK references left behind. (Earlier this was blocked
+outright if the user had any activity, to avoid corrupting settled-round history -
+cascading is the more useful behaviour the admin actually wants when cleaning up an
+account, and leaderboards/pots are always derived fresh from `Prediction`/`RoundEntry`
+so there's nothing "settled" to corrupt.)
+
+### Display names — User.display_name, app/blueprints/auth.py:profile
+Login identity (`username`) and public identity (`display_name`) are deliberately
+separate columns: `username` is collected at sign-up purely to log in and is never
+shown to anyone but its owner (and the admin, who needs it to manage accounts);
+`display_name` is what every other player sees — players grid, leaderboard, pot/
+finance rows, avatar initials (`main._avatar`), and the navbar. It's required
+(`nullable=False`) and collected alongside username at registration
+(`RegistrationForm`/`auth.register`) and admin user creation (`AdminCreateUserForm`/
+`admin.create_user`); existing accounts were backfilled to `display_name = username`
+by migration `760005299371_add_user_display_name` (added nullable, backfilled via
+`UPDATE`, then tightened to `NOT NULL` - the standard 3-step pattern for adding a
+required column to a populated table). Players can change theirs any time on the new
+`/auth/profile` page (`ProfileForm`, `auth/profile.html`) without touching their
+login credential. Sort order in the places that show it (`main.players`,
+`leaderboards.round_leaderboard`/`tournament_standings`) was switched from
+`User.username` to `User.display_name` so the on-screen order matches what's
+displayed.
+
+### Per-round stake — Round.stake_amount, app/finance.py
+The pot used to be a hardcoded `STAKE_AMOUNT = £5.00` constant; it's now
+`Round.stake_amount` (`Numeric(8, 2)`, set by the admin on the "create draft round"
+form - `admin.create_round` parses and validates it as a positive `Decimal`,
+defaulting to `DEFAULT_STAKE_AMOUNT` (£5.00, in `app/models.py`) when left blank).
+Every pot/settlement calculation (`finance.round_pot`/`round_financial_summary`,
+`main.round_opt_in`'s confirmation flash, `predictions.my_predictions`'s opt-in nudge,
+the players-grid opt-in button/hint) now reads the *round's* stake rather than a
+global constant, so different rounds (e.g. knockout vs. group stage) can carry
+different buy-ins. Migration `b8059953b427_add_round_stake_amount` backfills existing
+rounds with the old £5.00 default via a `server_default` that's then dropped, so the
+column can be `NOT NULL` without disturbing rounds created before this change.
 
 ## Project layout
 

@@ -1,0 +1,80 @@
+{# Shared compact "record list" styling for the admin section — included by every
+   admin/*.html page so wide multi-column tables never need horizontal scrolling
+   on a phone. Each record renders as a self-contained card: a header row (title +
+   status), a wrapping line of secondary details, and a wrapping row of actions —
+   all flex-based so nothing overflows regardless of content length. #}
+<style>
+  .admin-page {
+    max-width: 48rem;
+  }
+  .admin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0 0 1.5rem;
+    padding: 0;
+    list-style: none;
+  }
+  .admin-row {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background: #fff;
+  }
+  .admin-row-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.6rem;
+    font-weight: 600;
+  }
+  .admin-row-meta {
+    margin-top: 0.3rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    color: #6c757d;
+  }
+  .admin-row-body {
+    margin-top: 0.4rem;
+    font-size: 0.9rem;
+  }
+  .admin-row-actions {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+  }
+  .admin-row-actions form {
+    display: inline-flex;
+    margin: 0;
+  }
+  .admin-empty {
+    color: #6c757d;
+    padding: 0.5rem 0;
+  }
+
+  /* Generic guard: nothing in the admin section should be allowed to force
+     horizontal scrolling on a narrow viewport — long unbroken strings (URLs,
+     emails, fixture names) wrap instead of pushing the layout wide. */
+  .admin-page, .admin-page * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .admin-page .btn,
+  .admin-page .form-control,
+  .admin-page .form-select {
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 575.98px) {
+    .admin-row-head {
+      font-size: 0.95rem;
+    }
+    .admin-page h1 {
+      font-size: 1.5rem;
+    }
+  }
+</style>
