@@ -201,13 +201,42 @@ flask run
 ## Railway deployment
 
 `Procfile` defines:
-- `web: gunicorn run:app`
+- `web: gunicorn run:app --workers 1`
 - `release: flask db upgrade && flask seed-admin` — runs migrations and (re)provisions
-  the superuser on every deploy.
+  the superuser on every deploy on Heroku-style platforms.
+
+**Railway does not execute the Procfile's `release:` line** (there's no
+`railway.json`/`railway.toml` configuring a pre-deploy/release command either) — so on
+Railway the schema was never migrated and the admin user never seeded, which surfaced as
+two symptoms after the first deploy: login 500s (no `users` row/table to authenticate
+against) and a DB error logged near dashboard loads whose SQL fragment was
+`fixtures.kickoff_at >= %(kickoff_at_1)s::TIMESTAMP WITHOUT TIME ZONE` — that's just
+the (correct, naive-UTC, `TIMESTAMP WITHOUT TIME ZONE`-compatible) compiled query from
+the scheduler's `_todays_fixtures` (`app/scheduler.py`, the only `Fixture.kickoff_at`
+inequality query in the codebase, which the in-process scheduler runs immediately on
+boot); the actual underlying error was "relation \"fixtures\" does not exist".
+
+**Fix**: `app/__init__.py`'s `run_startup_tasks` now runs `flask_migrate.upgrade()` and
+seeds/promotes the admin (via `_seed_admin`, shared with the `seed-admin` CLI command)
+on every app boot, inside `with app.app_context()` and wrapped in try/except so a
+not-yet-reachable DB logs instead of crashing the worker. Both operations are idempotent,
+so this is safe to run on every boot regardless of platform — Railway, Heroku, or local.
+The Procfile's `release:` line is left in place for Heroku-style platforms that do run it.
 
 Set `DATABASE_URL` (Railway Postgres plugin provides this — `config.py` normalizes
-`postgres://` → `postgresql://` automatically), `SECRET_KEY`, `FOOTBALL_DATA_API_KEY`,
-and `ADMIN_USERNAME`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` as Railway environment variables.
+`postgres://`/`postgresql://` → `postgresql+psycopg://` for the psycopg v3 driver,
+see [[psycopg v3 driver]]), `SECRET_KEY`, `FOOTBALL_DATA_API_KEY`, and
+`ADMIN_USERNAME`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` as Railway environment variables.
+
+### psycopg v3 driver — config._normalize_db_url
+Switched from `psycopg2-binary` to `psycopg[binary]` (psycopg v3) because Railway's
+runtime image lacks the system `libpq.so.5` that plain `psycopg2`/`postgresql://`
+(which resolves to the psycopg2 dialect) dynamically links against, crashing on boot
+with `ImportError: libpq.so.5: cannot open shared object file`. psycopg v3's binary
+wheel bundles `libpq` itself. `_normalize_db_url` rewrites whatever Railway/Heroku-style
+URL it's handed (`postgres://` or `postgresql://`) to `postgresql+psycopg://`, pinning
+the dialect explicitly — the bare `postgresql://` scheme would otherwise resolve to the
+psycopg2 dialect by default and reintroduce the crash.
 
 ## Round structure (admin will create these manually after deploy)
 
