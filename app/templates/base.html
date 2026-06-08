@@ -30,7 +30,10 @@
 <body class="{% block body_class %}{% endblock %}">
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
-      <a class="navbar-brand" href="{{ url_for('main.index') }}">World Cup 2026 Predictions</a>
+      <a class="navbar-brand d-flex flex-column align-items-center lh-1" href="{{ url_for('main.index') }}">
+        <span style="font-weight:800;letter-spacing:.06em;">LEBIM</span>
+        <span style="font-size:.7em;font-weight:400;opacity:.85;">World Cup 2026 Predictions</span>
+      </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
       </button>
