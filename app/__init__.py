@@ -144,6 +144,13 @@ def register_template_helpers(app):
         sign = "-" if amount < 0 else ("+" if signed else "")
         return f"{sign}£{abs(amount):.2f}"
 
+    @app.template_filter("flag")
+    def format_team_flag(team_name):
+        """Render a national team's flag emoji, or '' if the team isn't recognised."""
+        from app.teams import flag_for
+
+        return flag_for(team_name)
+
     @app.template_filter("london")
     def format_london_time(value, fmt="%a %d %b, %H:%M %Z"):
         """Render a naive UTC datetime (as stored in the DB) in UK local time.

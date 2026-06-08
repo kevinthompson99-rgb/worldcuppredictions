@@ -61,7 +61,7 @@ def my_predictions():
 
         db.session.commit()
         flash("Your predictions have been saved.", "success")
-        return redirect(url_for("predictions.my_predictions"))
+        return redirect(url_for("main.players"))
 
     for fixture in fixtures:
         prediction = predictions.get(fixture.id)
@@ -76,5 +76,4 @@ def my_predictions():
         locked=locked,
         opted_in=opted_in,
         form=form,
-        prediction_count=sum(1 for fixture in fixtures if fixture.id in predictions),
     )

@@ -108,7 +108,6 @@ def players():
     ]
 
     standings = tournament_standings()
-    my_prediction_count = sum(1 for fixture in fixtures if (current_user.id, fixture.id) in predictions)
 
     return render_template(
         "main/players.html",
@@ -116,7 +115,6 @@ def players():
         users=users,
         grid=grid,
         locked=locked,
-        my_prediction_count=my_prediction_count,
         avatars={user.id: _avatar(user) for user in users},
         totals={user.id: points for user, points in standings},
         opted_in=opted_in,

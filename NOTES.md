@@ -14,9 +14,24 @@ polling during match windows, daily sync otherwise, all logged to `PollLog` and 
 in the admin panel (`/admin/polling`, plus a "last run" summary on `/admin/`).
 
 **Built this session:**
-- **Navigation redesign — split the players home screen into focused screens** with
-  a mobile-style bottom tile bar (Home / Predictions / Leaderboard / Admin). See
-  [[Navigation redesign]].
+- **Navigation redesign, round 2 — Home is the hub, no persistent nav.** Split the
+  players home screen into Home / My predictions / Leaderboard (a follow-up to the
+  previous session's split, which had added a fixed bottom tile bar — removed again
+  in favour of "Home is always the landing screen, reached and returned to via tiles
+  and a back link only"). Also: moved the admin entry point to a small corner gear
+  icon on Home (admin-only), trimmed copy further (dropped the "good luck"/
+  "predictions hidden here" hints, the score key/legend, and the "you've entered
+  X of Y" counts on both Home and My predictions as redundant - the grid and the
+  entry form make actual progress obvious without a number), shortened the footer,
+  and added flag emoji next to every team name app-wide. Also redesigned the
+  players grid's per-user header: username above a circular avatar with a small
+  round-points "moon" tucked into its bottom-right edge (`.avatar-orbit`/
+  `.points-moon` in `main/players.html`), replacing the separate "N pts" pill
+  stacked below - more compact, reads as one unit per player. See
+  [[Navigation redesign]] and [[Team flags]].
+- **Admin user management** — `/admin/users` can now create and delete accounts
+  directly (with an "Admin" checkbox), rather than requiring hand-edits to the DB
+  to promote additional admins. See [[Admin auth]].
 - **Live match scores on the results page** — `main/round_results.html` shows a live
   `LIVE <minute>'` badge + running score, final score + winner, or "Not started", and
   auto-refreshes every 3 minutes via `fetch` against the new `main.round_live_scores`
@@ -209,27 +224,33 @@ a separate lookup. **Superseded by [[Navigation redesign]]**: the live-polling
 `main.leaderboard` screen — the financial settlement it shows is computed per-load
 anyway, so a 3-minute live poll added little for the added complexity.
 
-### Navigation redesign — bottom tile bar + dedicated screens
+### Navigation redesign — Home is the hub, dedicated screens for the rest
 The previous "single home screen" layout (players grid + inline prediction entry +
 both leaderboards all on `main.players`) got cramped as more was bolted onto it
 (opt-in/pot status, financial summaries, live polling). Split back out into a small
-set of focused screens, navigated via a fixed bottom tile bar (`base.html`,
-mobile-first/PWA-style — Home / Predictions / Leaderboard, plus Admin for admins)
-that replaces the old top navbar links for authenticated users:
+set of focused screens reached *only* from Home — there's no persistent nav (an
+earlier pass added a fixed bottom tile bar, but that was removed in favour of
+"home is always the landing screen, everything else is one tap away and one tap
+back"):
 
-- **`main.players` ("Home")** — now a *read-only* gameweek overview: pot/opt-in
-  status and the players grid (clock icons hide everyone's picks, including your
-  own, until the round locks — editing your own moved off this screen entirely).
-  Two quick-link tiles (`players-actions`) point at the other two screens.
-- **`predictions.my_predictions` ("Predictions")** — new dedicated screen
+- **`main.players` ("Home")** — the landing screen and hub: pot/opt-in status and
+  the read-only players grid (clock icons hide everyone's picks, including your
+  own, until the round locks — editing your own moved off this screen entirely),
+  plus two quick-link tiles (`players-actions`) to the other two screens. Admins
+  get a small gear icon (`.admin-cog`) fixed to the top-right corner, linking to
+  `admin.dashboard` — the only admin entry point on this screen, and invisible to
+  regular users.
+- **`predictions.my_predictions` ("My predictions")** — dedicated screen
   (`predictions/edit.html`) for entering/editing your own picks before the
-  deadline; the inline per-cell score-input editing on the grid is gone. Requires
-  having opted in first (the home screen prompts for that; landing here without
-  opting in redirects back with a flash nudge).
-- **`main.leaderboard` ("Leaderboard")** — new dedicated screen
-  (`main/leaderboard.html`, replacing the old in-page tabs on `main.players`)
-  with the same two tabs (this round's pot standings + season table), now able to
-  breathe with its own page.
+  deadline. Requires having opted in first (Home prompts for that; landing here
+  without opting in redirects back with a flash nudge). On successful save it
+  redirects straight to `main.players` — no back button, since saving *is* the
+  exit action.
+- **`main.leaderboard` ("Leaderboard")** — dedicated screen (`main/leaderboard.html`,
+  replacing the old in-page tabs on `main.players`) with the same two tabs (this
+  round's pot standings + season table). Has a `&larr; Home` back link
+  (`.leaderboard-back`) since, unlike Predictions, landing here doesn't have a
+  natural exit action of its own.
 
 `main.round_leaderboard_view`/`main.tournament_leaderboard_view` still redirect
 (now to `main.leaderboard`) to keep old bookmarks alive. The live-refreshing
@@ -238,6 +259,22 @@ leaderboard it fed — `main.leaderboard` is now a plain server-rendered page (t
 financial settlement it shows is computed per-load anyway, so a live poll added
 little). `_cell` in `main.py` lost its `editable` status — every cell is now either
 `hidden` or one of the post-lock states, since editing happens on its own screen.
+The score key/legend under the grid was also removed (the icons/highlights are
+considered self-explanatory enough on their own).
+
+### Team flags — app/teams.py
+`flag_for`/the `flag` template filter render a national flag emoji next to team
+names wherever they appear (players grid, My predictions, admin fixtures/round
+screens) — format `{{ team | flag }} {{ team }}`. Built on a name→ISO-3166-1-alpha-2
+lookup (`_TEAM_CODES` in `app/teams.py`, converted to emoji via regional indicator
+symbols) covering the 2026 hosts and the confederations' likely 48 qualifiers, plus
+common aliases football-data.org might return (e.g. "USA"/"United States",
+"Korea Republic"/"South Korea"). England/Scotland/Wales use literal emoji tag
+sequences (no ISO code exists for home nations). Unrecognised names render no flag
+(`flag_for` returns `""`) rather than guessing — **worth spot-checking once real
+fixtures sync in**, since the UEFA play-off path wasn't finalised as of this
+session's knowledge cutoff and football-data.org's exact naming (short vs. long
+form, diacritics) is unconfirmed against the live feed.
 
 ### Password hashing
 Explicitly set to `pbkdf2:sha256` in `User.set_password` — werkzeug's default (`scrypt`)
@@ -248,8 +285,16 @@ with a LibreSSL-linked Python 3.9). pbkdf2 is broadly compatible and still solid
 Not a separate `Admin` model — `User.is_admin` boolean. The single superuser is
 provisioned/promoted via `flask seed-admin`, which reads `ADMIN_USERNAME`/`ADMIN_EMAIL`/
 `ADMIN_PASSWORD` env vars (wired into the Railway `release` step in the Procfile).
-Additional admins, if ever needed, would have to be promoted by hand in the DB —
-there's no UI for it (open registration + a single curated superuser per the spec).
+
+`/admin/users` now also has its own add/delete UI (`admin.create_user`/`admin.delete_user`,
+`AdminCreateUserForm` in `app/forms.py`) — the admin can create accounts directly
+(with an optional "Admin" checkbox, so promoting additional admins no longer needs
+hand-editing the DB) and remove ones that were created in error. **Deletion is
+deliberately conservative**: blocked entirely if the user has ever made a prediction
+or joined a round's pot (`Prediction`/`RoundEntry` rows would otherwise dangle or, if
+cascaded, silently rewrite leaderboard/financial history), and an admin can't delete
+their own account. This covers the realistic case (cleaning up a mistyped signup)
+without opening the door to corrupting settled-round history.
 
 ## Project layout
 

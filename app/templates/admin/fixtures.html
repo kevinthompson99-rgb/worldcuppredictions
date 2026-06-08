@@ -12,7 +12,7 @@
   <tbody>
     {% for fixture in fixtures %}
     <tr>
-      <td>{{ fixture.home_team }} v {{ fixture.away_team }}</td>
+      <td>{{ fixture.home_team | flag }} {{ fixture.home_team }} v {{ fixture.away_team }} {{ fixture.away_team | flag }}</td>
       <td><small>{{ fixture.stage }} {% if fixture.group_name %}&middot; {{ fixture.group_name }}{% endif %}</small></td>
       <td>{{ fixture.round.name if fixture.round else '—' }}</td>
       <td><small>{{ fixture.kickoff_at | london('%d %b, %H:%M %Z') }}</small></td>
@@ -25,8 +25,8 @@
           <input type="number" name="away_score_90" class="form-control form-control-sm" style="width: 4.5rem;" value="{{ fixture.away_score_90 if fixture.away_score_90 is not none else '' }}" min="0">
           <select name="winner" class="form-select form-select-sm" style="width: 8rem;">
             <option value="">winner…</option>
-            <option value="HOME" {{ 'selected' if fixture.winner == 'HOME' }}>{{ fixture.home_team }}</option>
-            <option value="AWAY" {{ 'selected' if fixture.winner == 'AWAY' }}>{{ fixture.away_team }}</option>
+            <option value="HOME" {{ 'selected' if fixture.winner == 'HOME' }}>{{ fixture.home_team | flag }} {{ fixture.home_team }}</option>
+            <option value="AWAY" {{ 'selected' if fixture.winner == 'AWAY' }}>{{ fixture.away_team | flag }} {{ fixture.away_team }}</option>
             <option value="DRAW" {{ 'selected' if fixture.winner == 'DRAW' }}>Draw</option>
           </select>
           <div class="form-check">

@@ -3,6 +3,7 @@
 {% block body_class %}leaderboard-body{% endblock %}
 {% block content %}
 <div class="leaderboard-page">
+  <a href="{{ url_for('main.players') }}" class="leaderboard-back">&larr; Home</a>
   <h1 class="leaderboard-h1">Leaderboard</h1>
 
   <ul class="nav nav-pills lb-tabs" role="tablist">
@@ -87,6 +88,16 @@
     color: #fff;
     font-size: 1.4rem;
     margin-bottom: 0.75rem;
+  }
+  .leaderboard-back {
+    display: inline-block;
+    margin-bottom: 0.5rem;
+    color: #9aa3ad;
+    text-decoration: none;
+    font-size: 0.85rem;
+  }
+  .leaderboard-back:hover {
+    color: #ffc107;
   }
   .leaderboard-muted {
     color: #9aa3ad;

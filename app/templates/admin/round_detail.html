@@ -60,7 +60,7 @@
           <td><small>{{ fixture.kickoff_at | london('%a %d %b %Y') }}</small></td>
           <td><small>{{ fixture.kickoff_at | london('%H:%M %Z') }}</small></td>
           <td>
-            {{ fixture.home_team }} v {{ fixture.away_team }}
+            {{ fixture.home_team | flag }} {{ fixture.home_team }} v {{ fixture.away_team }} {{ fixture.away_team | flag }}
             {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
           </td>
           <td>
@@ -95,7 +95,7 @@
             <td><small>{{ fixture.kickoff_at | london('%a %d %b %Y') }}</small></td>
             <td><small>{{ fixture.kickoff_at | london('%H:%M %Z') }}</small></td>
             <td>
-              {{ fixture.home_team }} v {{ fixture.away_team }}
+              {{ fixture.home_team | flag }} {{ fixture.home_team }} v {{ fixture.away_team }} {{ fixture.away_team | flag }}
               <small class="text-muted">{{ fixture.stage }}</small>
               {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
             </td>

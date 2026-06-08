@@ -3,6 +3,9 @@
 {% block body_class %}players-body{% endblock %}
 {% block content %}
 <div class="players-page">
+  {% if current_user.is_admin %}
+    <a href="{{ url_for('admin.dashboard') }}" class="admin-cog" title="Admin">&#9881;&#65039;</a>
+  {% endif %}
   <h1 class="players-h1">Players</h1>
 
   {% if round is none %}
@@ -17,7 +20,6 @@
       {% else %}
         <div class="round-card-status">
           Predictions lock <strong>{{ round.lock_time | london('%a %d %b, %H:%M %Z') }}</strong>
-          {% if opted_in %}&middot; you've entered {{ my_prediction_count }} of {{ grid|length }}{% endif %}
         </div>
       {% endif %}
       <div class="round-card-pot">
@@ -31,8 +33,6 @@
         </form>
       {% elif not opted_in %}
         <div class="opt-in-closed">Opt-in is closed for this round &mdash; you weren't entered into the pot.</div>
-      {% else %}
-        <div class="opt-in-confirmed">You're in this round's pot &mdash; good luck!</div>
       {% endif %}
     </div>
 
@@ -56,10 +56,6 @@
         <p class="players-hint opt-in-prompt">
           Join this round above to take part in the {{ stake_amount | gbp }} pot &mdash; you'll need to before you can enter predictions.
         </p>
-      {% elif not locked %}
-        <p class="players-hint">
-          Predictions are hidden here until the round locks &mdash; head to <a href="{{ url_for('predictions.my_predictions') }}">My predictions</a> to enter or check yours.
-        </p>
       {% endif %}
 
       <div class="players-grid-wrap" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
@@ -69,9 +65,11 @@
               <th class="corner-cell">Fixture</th>
               {% for user in users %}
                 <th class="user-cell{{ ' is-me' if user.id == current_user.id }}">
-                  <span class="avatar" style="background-color: {{ avatars[user.id].color }};">{{ avatars[user.id].initials }}</span>
                   <span class="user-name">{{ user.username }}</span>
-                  <span class="points-badge">{{ totals.get(user.id, 0) }} pts</span>
+                  <span class="avatar-orbit">
+                    <span class="avatar" style="background-color: {{ avatars[user.id].color }};">{{ avatars[user.id].initials }}</span>
+                    <span class="points-moon" title="{{ totals.get(user.id, 0) }} points">{{ totals.get(user.id, 0) }}</span>
+                  </span>
                 </th>
               {% endfor %}
             </tr>
@@ -80,7 +78,7 @@
             {% for row in grid %}
               <tr>
                 <th class="fixture-cell" scope="row">
-                  <div class="fixture-teams">{{ row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_team }}</div>
+                  <div class="fixture-teams">{{ row.fixture.home_team | flag }} {{ row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_team }} {{ row.fixture.away_team | flag }}</div>
                   <div class="fixture-meta js-fixture-meta" data-fixture-id="{{ row.fixture.id }}" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
                     {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
                     {% if row.fixture.is_finished %}
@@ -108,14 +106,6 @@
             {% endfor %}
           </tbody>
         </table>
-      </div>
-
-      <div class="players-key">
-        <span class="key-item"><span class="cell-icon clock-icon">&#9201;</span> submitted &amp; hidden until lock</span>
-        <span class="key-item"><span class="key-swatch correct-swatch"></span> correct result</span>
-        <span class="key-item"><span class="cell-icon star-icon">&#9733;</span> exact score</span>
-        <span class="key-item"><span class="key-swatch wrong-swatch"></span> wrong result</span>
-        <span class="key-item"><span class="key-swatch me-swatch"></span> your column</span>
       </div>
     {% endif %}
   {% endif %}
@@ -179,6 +169,15 @@
 
   .players-page {
     color: #e9ecef;
+    position: relative;
+  }
+  .admin-cog {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 1.3rem;
+    text-decoration: none;
+    line-height: 1;
   }
   .players-h1 {
     color: #fff;
@@ -241,12 +240,6 @@
   .opt-in-prompt {
     color: #ffd166;
   }
-  .opt-in-confirmed {
-    margin-top: 0.6rem;
-    font-size: 0.8rem;
-    color: #6ee7a0;
-  }
-
   .players-actions {
     margin-top: 0.75rem;
     display: flex;
@@ -323,11 +316,29 @@
   }
 
   .user-cell {
-    min-width: 5.5rem;
+    min-width: 4.5rem;
     vertical-align: top;
   }
   .user-cell.is-me {
     background: #233447;
+  }
+  .user-name {
+    display: block;
+    margin: 0 auto 0.4rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #e9ecef;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 5.5rem;
+  }
+  /* The points "moon" sits tucked into the avatar's bottom-right edge, like a
+     small body orbiting a planet - compact enough not to need its own row. */
+  .avatar-orbit {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
   }
   .avatar {
     display: inline-flex;
@@ -340,25 +351,26 @@
     font-size: 0.8rem;
     color: #16181b;
   }
-  .user-name {
-    display: block;
-    margin-top: 0.3rem;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #e9ecef;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 6rem;
-  }
-  .points-badge {
-    display: inline-block;
-    margin-top: 0.2rem;
-    font-size: 0.68rem;
-    padding: 0.1rem 0.45rem;
-    border-radius: 1rem;
+  .points-moon {
+    position: absolute;
+    right: -0.4rem;
+    bottom: -0.25rem;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    padding: 0 0.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
     background: #2a2f36;
-    color: #adb5bd;
+    border: 2px solid #1f242b;
+    color: #ffd166;
+    font-size: 0.58rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .user-cell.is-me .points-moon {
+    border-color: #233447;
   }
 
   .fixture-cell {
@@ -419,36 +431,6 @@
   }
   .star-icon {
     color: #ffd43b;
-  }
-
-  .players-key {
-    margin-top: 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.25rem;
-    font-size: 0.78rem;
-    color: #9aa3ad;
-  }
-  .key-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .key-swatch {
-    display: inline-block;
-    width: 1rem;
-    height: 1rem;
-    border-radius: 0.25rem;
-  }
-  .correct-swatch {
-    background: rgba(46, 204, 113, 0.4);
-  }
-  .wrong-swatch {
-    background: #181b20;
-    border: 1px solid #2a2f36;
-  }
-  .me-swatch {
-    background: rgba(64, 145, 255, 0.3);
   }
 
   @media (min-width: 768px) {

@@ -30,7 +30,6 @@
       <div class="round-card-name">{{ round.name }}</div>
       <div class="round-card-status">
         Predictions lock <strong>{{ round.lock_time | london('%a %d %b, %H:%M %Z') }}</strong>
-        &middot; you've entered {{ prediction_count }} of {{ fixtures|length }}
       </div>
     </div>
 
@@ -40,7 +39,7 @@
         {% for fixture in fixtures %}
           <li class="fixture-row">
             <div class="fixture-info">
-              <div class="fixture-teams">{{ fixture.home_team }} <span class="vs">v</span> {{ fixture.away_team }}</div>
+              <div class="fixture-teams">{{ fixture.home_team | flag }} {{ fixture.home_team }} <span class="vs">v</span> {{ fixture.away_team }} {{ fixture.away_team | flag }}</div>
               <div class="fixture-meta">{{ fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}</div>
             </div>
             <div class="fixture-score-entry">

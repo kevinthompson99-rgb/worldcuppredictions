@@ -1,17 +1,19 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.admin_utils import admin_required
 from app.extensions import db
 from app.finance import all_rounds_financial_summary
-from app.forms import CSRFForm
+from app.forms import AdminCreateUserForm, CSRFForm
 from app.models import (
     ROUND_STATUS_ACTIVE,
     ROUND_STATUS_COMPLETE,
     ROUND_STATUS_DRAFT,
     Fixture,
     PollLog,
+    Prediction,
     Round,
+    RoundEntry,
     User,
 )
 from app.round_helpers import get_active_round, get_draft_round
@@ -313,4 +315,60 @@ def edit_fixture(fixture_id):
 
 @bp.route("/users")
 def users():
-    return render_template("admin/users.html", users=User.query.order_by(User.username.asc()).all())
+    return render_template(
+        "admin/users.html",
+        users=User.query.order_by(User.username.asc()).all(),
+        create_form=AdminCreateUserForm(),
+        delete_form=CSRFForm(),
+    )
+
+
+@bp.route("/users/new", methods=["POST"])
+def create_user():
+    form = AdminCreateUserForm()
+    if form.validate_on_submit():
+        user = User(
+            username=form.username.data.strip(),
+            email=form.email.data.lower().strip(),
+            is_admin=form.is_admin.data,
+        )
+        user.set_password(form.password.data)
+        db.session.add(user)
+        db.session.commit()
+        flash(f"Added user '{user.username}'.", "success")
+        return redirect(url_for("admin.users"))
+
+    for field in form:
+        for error in field.errors:
+            flash(error, "danger")
+    return redirect(url_for("admin.users"))
+
+
+@bp.route("/users/<int:user_id>/delete", methods=["POST"])
+def delete_user(user_id):
+    form = CSRFForm()
+    if not form.validate_on_submit():
+        abort(400, description="Invalid or missing CSRF token.")
+
+    user = User.query.get_or_404(user_id)
+
+    if user.id == current_user.id:
+        flash("You can't delete your own account.", "danger")
+        return redirect(url_for("admin.users"))
+
+    has_activity = (
+        Prediction.query.filter_by(user_id=user.id).first() is not None
+        or RoundEntry.query.filter_by(user_id=user.id).first() is not None
+    )
+    if has_activity:
+        flash(
+            f"Can't delete '{user.username}' - they've already made predictions or joined a round's "
+            "pot, and removing them would corrupt that history.",
+            "danger",
+        )
+        return redirect(url_for("admin.users"))
+
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"Deleted user '{user.username}'.", "info")
+    return redirect(url_for("admin.users"))
