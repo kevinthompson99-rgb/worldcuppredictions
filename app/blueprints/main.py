@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, url_for
@@ -62,12 +63,22 @@ def _cell(user, prediction, fixture, locked, is_me):
 
 @bp.route("/sw.js")
 def service_worker():
-    """Serve the service worker from the root so its scope covers the whole app
-    — registering it from /static/sw.js would limit it to the /static/ path.
+    """Serve the service worker from the root (scope covers the whole app).
+
+    Prepends a deploy-time stamp so the file bytes change on every process restart
+    (= every Railway deploy), letting the browser detect the update automatically
+    without requiring a manual CACHE_NAME bump in sw.js.
     """
-    response = current_app.send_static_file("sw.js")
-    response.headers["Cache-Control"] = "no-cache"
-    return response
+    sw_path = os.path.join(current_app.static_folder, "sw.js")
+    with open(sw_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    deploy_time = current_app.config.get("DEPLOY_TIME", 0)
+    versioned = f"/* deploy:{deploy_time} */\n" + content
+    return current_app.response_class(
+        versioned,
+        mimetype="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @bp.route("/")

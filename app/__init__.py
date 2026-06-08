@@ -1,4 +1,5 @@
 import os
+import time
 
 import click
 from flask import Flask
@@ -10,6 +11,9 @@ from config import Config
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    # Stamped once at process startup, injected into /sw.js so every deploy (= process
+    # restart) produces different SW bytes → browser detects the change automatically.
+    app.config["DEPLOY_TIME"] = int(time.time())
 
     db.init_app(app)
     migrate.init_app(app, db)

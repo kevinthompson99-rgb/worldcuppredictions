@@ -57,7 +57,7 @@
         <table class="players-grid">
           <thead>
             <tr>
-              <th class="corner-cell">Fixtures</th>
+              <th class="corner-cell">Fixtures ({{ fixtures|length }})</th>
               {% for user in users %}
                 <th class="user-cell{{ ' is-me' if user.id == current_user.id }}">
                   <span class="user-name">{{ user.display_name }}</span>

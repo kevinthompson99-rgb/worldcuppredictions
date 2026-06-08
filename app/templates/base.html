@@ -147,28 +147,45 @@
       banner.hidden = false;
     }
 
+    // Watch a worker that is currently installing. When it reaches "installed"
+    // state and there is already a controller (i.e. this is an update, not a
+    // first install) the update banner is shown.
+    function trackInstalling(worker) {
+      if (!worker) return;
+      worker.addEventListener("statechange", function () {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          showBanner(worker);
+        }
+      });
+    }
+
     // Explicit root scope - covers every route, including /admin/* - so the
     // whole app (not just the parts a user happens to land on first) is
     // handled by the worker and stays inside the installed PWA shell.
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).then(function (registration) {
-      // A worker may already be waiting from a previous visit (e.g. the tab
-      // was never refreshed after the last deploy went out).
-      if (registration.waiting && registration.active) {
-        showBanner(registration.waiting);
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).then(function (reg) {
+      // A worker is already waiting (e.g. the user didn't refresh after a
+      // previous deploy's update prompt). Show the banner right away.
+      if (reg.waiting) {
+        showBanner(reg.waiting);
+        return;
       }
 
-      registration.addEventListener("updatefound", function () {
-        var installing = registration.installing;
-        if (!installing) return;
-        installing.addEventListener("statechange", function () {
-          if (installing.state === "installed" && navigator.serviceWorker.controller) {
-            showBanner(installing);
-          }
-        });
+      // The update check is asynchronous; it is possible that updatefound
+      // already fired before this .then() ran and we missed it. Check the
+      // installing slot directly to handle that race.
+      if (reg.installing) {
+        trackInstalling(reg.installing);
+      }
+
+      // Normal path: the browser will fetch /sw.js, detect changed bytes
+      // (the deploy stamp injected by the server ensures every restart is a
+      // new version), start a new install and fire updatefound.
+      reg.addEventListener("updatefound", function () {
+        trackInstalling(reg.installing);
       });
     }).catch(function () {
-      // Offline support is a nicety, not a requirement - a registration
-      // failure shouldn't be visible to the user.
+      // Offline support is a nicety, not a requirement — a registration
+      // failure should not be shown to the user.
     });
 
     // Reload once the new worker actually takes control, so the refreshed

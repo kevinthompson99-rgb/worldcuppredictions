@@ -38,15 +38,17 @@
       <ul class="fixture-list">
         {% for fixture in fixtures %}
           <li class="fixture-row">
-            <div class="fixture-info">
-              <div class="fixture-teams">{{ fixture.home_team | flag }} {{ fixture.home_team }} <span class="vs">v</span> {{ fixture.away_team }} {{ fixture.away_team | flag }}</div>
-              <div class="fixture-meta">{{ fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}</div>
+            <div class="fixture-teams">
+              {{ fixture.home_team | flag }} {{ fixture.home_team }}
+              <span class="vs">v</span>
+              {{ fixture.away_team }} {{ fixture.away_team | flag }}
             </div>
             <div class="fixture-score-entry">
               {{ form["home_" ~ fixture.id](class_="score-input") }}
               <span class="dash">&ndash;</span>
               {{ form["away_" ~ fixture.id](class_="score-input") }}
             </div>
+            <div class="fixture-meta">{{ fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}</div>
             {% for field_name in ["home_" ~ fixture.id, "away_" ~ fixture.id] %}
               {% for error in form[field_name].errors %}
                 <div class="score-error">{{ error }}</div>
@@ -120,35 +122,36 @@
     background: #1a1e24;
     border: 1px solid #2a2f36;
     border-radius: 0.6rem;
-    padding: 0.65rem 0.85rem;
+    padding: 0.75rem 1rem;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
     gap: 0.5rem;
+    text-align: center;
   }
   .fixture-teams {
     font-weight: 600;
     color: #fff;
     font-size: 0.95rem;
+    line-height: 1.4;
   }
   .fixture-teams .vs {
     color: #6c757d;
     font-weight: 400;
-    margin: 0 0.25rem;
+    margin: 0 0.3rem;
   }
   .fixture-meta {
     font-size: 0.75rem;
     color: #9aa3ad;
-    margin-top: 0.15rem;
   }
   .fixture-score-entry {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
   .fixture-score-entry .dash {
     color: #9aa3ad;
+    font-size: 1.1rem;
   }
   .score-input {
     width: 2.6rem;
