@@ -36,15 +36,14 @@
       {% endif %}
     </div>
 
-    {# ---- Quick links to the dedicated screens ---- #}
+    {# ---- Quick links to the dedicated screens - icon-only, kept small and out
+       of the way so the grid stays the focus of this screen ---- #}
     <div class="players-actions">
-      <a href="{{ url_for('predictions.my_predictions') }}" class="players-action-tile">
+      <a href="{{ url_for('predictions.my_predictions') }}" class="players-action-tile" title="My predictions" aria-label="My predictions">
         <span class="players-action-icon">&#9999;&#65039;</span>
-        <span class="players-action-label">My predictions</span>
       </a>
-      <a href="{{ url_for('main.leaderboard') }}" class="players-action-tile">
+      <a href="{{ url_for('main.leaderboard') }}" class="players-action-tile" title="Leaderboard" aria-label="Leaderboard">
         <span class="players-action-icon">&#127942;</span>
-        <span class="players-action-label">Leaderboard</span>
       </a>
     </div>
 
@@ -241,34 +240,29 @@
     color: #ffd166;
   }
   .players-actions {
-    margin-top: 0.75rem;
+    margin-top: 0.6rem;
     display: flex;
-    gap: 0.6rem;
+    justify-content: flex-end;
+    gap: 0.5rem;
   }
   .players-action-tile {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+    display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
     background: #1f242b;
     border: 1px solid #2a2f36;
-    border-radius: 0.6rem;
-    padding: 0.75rem 0.5rem;
+    border-radius: 50%;
     text-decoration: none;
-    color: #e9ecef;
     transition: background-color 0.15s ease;
   }
   .players-action-tile:hover {
     background: #262c34;
-    color: #fff;
   }
   .players-action-icon {
-    font-size: 1.4rem;
-  }
-  .players-action-label {
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 1.05rem;
+    line-height: 1;
   }
 
   .players-grid-wrap {

@@ -236,7 +236,9 @@ back"):
 - **`main.players` ("Home")** — the landing screen and hub: pot/opt-in status and
   the read-only players grid (clock icons hide everyone's picks, including your
   own, until the round locks — editing your own moved off this screen entirely),
-  plus two quick-link tiles (`players-actions`) to the other two screens. Admins
+  plus two small icon-only quick-link tiles (`players-actions` / `players-action-tile`
+  — a pencil for My predictions, a trophy for Leaderboard, right-aligned and kept
+  deliberately unobtrusive so the grid stays the focus) to the other two screens. Admins
   get a small gear icon (`.admin-cog`) fixed to the top-right corner, linking to
   `admin.dashboard` — the only admin entry point on this screen, and invisible to
   regular users.
