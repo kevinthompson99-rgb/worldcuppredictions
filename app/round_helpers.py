@@ -1,11 +1,13 @@
 """Helpers for finding rounds by their admin-curated lifecycle status (see Round.status).
 
-At most one round is ever DRAFT and at most one is ever ACTIVE (enforced in the admin
-blueprint's create/publish actions) - so "the" draft and "the" active round are
-well-defined singletons from the user-facing app's point of view.
+At most one round is ever ACTIVE (enforced in the admin blueprint's publish action).
+Up to two rounds may be DRAFT simultaneously - the admin can prepare the next two
+rounds while the current one is still playing out.
 """
 
 from app.models import ROUND_STATUS_ACTIVE, ROUND_STATUS_COMPLETE, ROUND_STATUS_DRAFT, Round
+
+MAX_DRAFT_ROUNDS = 2
 
 
 def get_active_round():
@@ -13,9 +15,14 @@ def get_active_round():
     return Round.query.filter_by(status=ROUND_STATUS_ACTIVE).first()
 
 
+def get_draft_rounds():
+    """All rounds the admin is currently preparing (invisible to regular users), up to MAX_DRAFT_ROUNDS."""
+    return Round.query.filter_by(status=ROUND_STATUS_DRAFT).order_by(Round.sequence.asc()).all()
+
+
 def get_draft_round():
-    """The round the admin is currently preparing (invisible to regular users), if any."""
-    return Round.query.filter_by(status=ROUND_STATUS_DRAFT).first()
+    """The earliest draft round, if any. Kept for callers that only care about one."""
+    return Round.query.filter_by(status=ROUND_STATUS_DRAFT).order_by(Round.sequence.asc()).first()
 
 
 def get_round_for_leaderboard():

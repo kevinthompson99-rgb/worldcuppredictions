@@ -17,7 +17,7 @@ from app.models import (
     Round,
     User,
 )
-from app.round_helpers import get_active_round, get_draft_round
+from app.round_helpers import MAX_DRAFT_ROUNDS, get_active_round, get_draft_round, get_draft_rounds
 from app.scoring import score_fixture
 from app.sync import sync_fixtures_and_results
 
@@ -36,7 +36,7 @@ def dashboard():
     return render_template(
         "admin/dashboard.html",
         active_round=get_active_round(),
-        draft_round=get_draft_round(),
+        draft_rounds=get_draft_rounds(),
         round_count=Round.query.count(),
         fixture_count=Fixture.query.count(),
         unassigned_count=Fixture.query.filter(Fixture.round_id.is_(None)).count(),
@@ -110,9 +110,7 @@ def rounds():
     return render_template(
         "admin/rounds.html",
         rounds=Round.query.order_by(Round.sequence.asc()).all(),
-        # Drafts are prepared one at a time, regardless of whether a round is active -
-        # that's the whole point of drafts (prep the next round while the current plays out).
-        can_create_draft=(get_draft_round() is None),
+        can_create_draft=(len(get_draft_rounds()) < MAX_DRAFT_ROUNDS),
         form=CSRFForm(),
     )
 
@@ -123,8 +121,8 @@ def create_round():
     if not form.validate_on_submit():
         abort(400, description="Invalid or missing CSRF token.")
 
-    if get_draft_round() is not None:
-        flash("There's already a draft round being prepared - finish that one first.", "danger")
+    if len(get_draft_rounds()) >= MAX_DRAFT_ROUNDS:
+        flash(f"You already have {MAX_DRAFT_ROUNDS} draft rounds being prepared — publish or delete one before creating another.", "danger")
         return redirect(url_for("admin.rounds"))
 
     name = request.form.get("name", "").strip()

@@ -64,8 +64,7 @@
   </div>
   {% else %}
   <div class="alert alert-info">
-    There's already a draft round being prepared &mdash; finish populating and publish it
-    before creating another.
+    You already have 2 draft rounds being prepared &mdash; publish or delete one before creating another.
     {% for round in rounds if round.status == 'DRAFT' %}
       <br><a href="{{ url_for('admin.round_detail', round_id=round.id) }}">Manage {{ round.name }} &raquo;</a>
     {% endfor %}

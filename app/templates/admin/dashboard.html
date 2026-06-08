@@ -12,7 +12,7 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-md-6">
+  <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
         <h5 class="card-title">Active round</h5>
@@ -29,22 +29,29 @@
       </div>
     </div>
   </div>
-  <div class="col-md-6">
+  {% for draft in draft_rounds %}
+  <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h5 class="card-title">Draft round</h5>
-        {% if draft_round %}
-          <p class="card-text mb-1"><strong>{{ draft_round.name }}</strong> <span class="badge bg-secondary">DRAFT</span></p>
-          <p class="card-text text-muted mb-2">{{ draft_round.fixtures.count() }} fixture(s) assigned &mdash; not yet visible to users.</p>
-          <a href="{{ url_for('admin.round_detail', round_id=draft_round.id) }}" class="btn btn-sm btn-outline-primary">Prepare &raquo;</a>
-        {% else %}
-          <p class="card-text text-muted mb-0">No draft round being prepared.
-            <a href="{{ url_for('admin.rounds') }}">Create one &raquo;</a>
-          </p>
-        {% endif %}
+        <h5 class="card-title">Draft round{% if draft_rounds|length > 1 %} {{ loop.index }}{% endif %}</h5>
+        <p class="card-text mb-1"><strong>{{ draft.name }}</strong> <span class="badge bg-secondary">DRAFT</span></p>
+        <p class="card-text text-muted mb-2">{{ draft.fixtures.count() }} fixture(s) assigned &mdash; not yet visible to users.</p>
+        <a href="{{ url_for('admin.round_detail', round_id=draft.id) }}" class="btn btn-sm btn-outline-primary">Prepare &raquo;</a>
       </div>
     </div>
   </div>
+  {% else %}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">Draft round</h5>
+        <p class="card-text text-muted mb-0">No draft round being prepared.
+          <a href="{{ url_for('admin.rounds') }}">Create one &raquo;</a>
+        </p>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
