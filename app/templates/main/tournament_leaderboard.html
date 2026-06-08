@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Tournament standings{% endblock %}
+{% block content %}
+<h1 class="mb-4">Tournament standings</h1>
+<table class="table table-striped">
+  <thead><tr><th>#</th><th>Player</th><th>Total points</th></tr></thead>
+  <tbody>
+    {% for user, points in rows %}
+    <tr {% if user.id == current_user.id %}class="table-primary"{% endif %}>
+      <td>{{ loop.index }}</td>
+      <td>{{ user.username }}</td>
+      <td>{{ points }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

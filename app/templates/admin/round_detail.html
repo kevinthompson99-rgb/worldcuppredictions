@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ round.name }}{% endblock %}
+{% block content %}
+<h1 class="mb-1">{{ round.name }}</h1>
+{% if round.description %}<p class="text-muted">{{ round.description }}</p>{% endif %}
+
+<div class="card mb-4" style="max-width: 40rem;">
+  <div class="card-body">
+    {% if round.lock_time %}
+      <p class="mb-1">
+        <strong>Locks at {{ round.lock_time.strftime('%a %d %b %Y, %H:%M UTC') }}</strong>
+        <span class="text-muted">(5 minutes before {{ round.earliest_kickoff.strftime('%H:%M UTC') }} kick-off)</span>
+      </p>
+    {% else %}
+      <p class="mb-1 text-muted">Lock time will be set automatically once you assign fixtures &mdash; it's always 5 minutes before the round's earliest kick-off.</p>
+    {% endif %}
+    <p class="mb-2">
+      Status:
+      {% if round.status == 'DRAFT' %}<span class="badge bg-secondary">Draft &mdash; admin only</span>
+      {% elif round.status == 'ACTIVE' %}
+        {% if round.is_locked %}<span class="badge bg-info text-dark">Active &mdash; locked, in progress</span>
+        {% else %}<span class="badge bg-success">Active &mdash; open for predictions</span>
+        {% endif %}
+      {% else %}<span class="badge bg-dark">Complete &amp; archived</span>
+      {% endif %}
+    </p>
+
+    {% if round.status == 'DRAFT' %}
+      <form method="post" action="{{ url_for('admin.publish_round', round_id=round.id) }}" class="d-inline">
+        {{ form.hidden_tag() }}
+        <button type="submit" class="btn btn-success btn-sm">Publish this round &mdash; make it active</button>
+      </form>
+      <p class="text-muted small mt-2 mb-0">
+        Publishing requires: at least one fixture assigned, no other round currently active,
+        and the lock time (5 minutes before earliest kick-off) not yet passed.
+        {% if active_round %}<br><strong>{{ active_round.name }}</strong> is currently active &mdash; mark it complete first.{% endif %}
+      </p>
+    {% elif round.status == 'ACTIVE' %}
+      <form method="post" action="{{ url_for('admin.complete_round', round_id=round.id) }}" class="d-inline">
+        {{ form.hidden_tag() }}
+        <button type="submit" class="btn btn-dark btn-sm" {% if not round.is_locked %}disabled{% endif %}>Mark as complete &amp; archive</button>
+      </form>
+      {% if not round.is_locked %}
+        <p class="text-muted small mt-2 mb-0">This round must lock (predictions close) before it can be marked complete.</p>
+      {% elif not round.all_fixtures_settled %}
+        <p class="text-warning small mt-2 mb-0">Not every fixture has a final score yet &mdash; you can still complete it, but double-check results first.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-6 mb-4">
+    <h5>Fixtures in this round</h5>
+    <table class="table table-sm align-middle">
+      <thead><tr><th>Date</th><th>Kick-off</th><th>Match</th><th></th></tr></thead>
+      <tbody>
+        {% for fixture in fixtures %}
+        <tr>
+          <td><small>{{ fixture.kickoff_at.strftime('%a %d %b %Y') }}</small></td>
+          <td><small>{{ fixture.kickoff_at.strftime('%H:%M UTC') }}</small></td>
+          <td>
+            {{ fixture.home_team }} v {{ fixture.away_team }}
+            {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
+          </td>
+          <td>
+            {% if not round.is_locked %}
+            <form method="post" action="{{ url_for('admin.unassign_fixture', fixture_id=fixture.id) }}">
+              {{ form.hidden_tag() }}
+              <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">No fixtures assigned yet &mdash; pick some from the list on the right.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col-lg-6 mb-4">
+    <h5>Add fixtures to this round</h5>
+    {% if round.is_locked %}
+      <p class="text-muted">This round has locked, so fixtures can no longer be assigned to it.</p>
+    {% elif unassigned %}
+    <form method="post" action="{{ url_for('admin.assign_fixtures', round_id=round.id) }}">
+      {{ form.hidden_tag() }}
+      <table class="table table-sm align-middle">
+        <thead><tr><th></th><th>Date</th><th>Kick-off</th><th>Match</th></tr></thead>
+        <tbody>
+          {% for fixture in unassigned %}
+          <tr>
+            <td><input type="checkbox" class="form-check-input" name="fixture_ids" value="{{ fixture.id }}"></td>
+            <td><small>{{ fixture.kickoff_at.strftime('%a %d %b %Y') }}</small></td>
+            <td><small>{{ fixture.kickoff_at.strftime('%H:%M UTC') }}</small></td>
+            <td>
+              {{ fixture.home_team }} v {{ fixture.away_team }}
+              <small class="text-muted">{{ fixture.stage }}</small>
+              {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-primary btn-sm">Assign selected fixtures to this round</button>
+    </form>
+    {% else %}
+      <p class="text-muted">
+        No unassigned fixtures available. For knockout rounds, matchups are usually only
+        confirmed once earlier rounds finish &mdash; try syncing from the
+        <a href="{{ url_for('admin.dashboard') }}">admin dashboard</a> once they're announced.
+      </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

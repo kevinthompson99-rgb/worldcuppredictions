@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Manage rounds{% endblock %}
+{% block content %}
+<h1 class="mb-4">Rounds</h1>
+
+<table class="table table-striped mb-4">
+  <thead><tr><th>#</th><th>Name</th><th>Fixtures</th><th>Locks at</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    {% for round in rounds %}
+    <tr>
+      <td>{{ round.sequence }}</td>
+      <td>{{ round.name }}{% if round.description %}<br><small class="text-muted">{{ round.description }}</small>{% endif %}</td>
+      <td>{{ round.fixtures.count() }}</td>
+      <td>{{ round.lock_time.strftime('%a %d %b, %H:%M UTC') if round.lock_time else '—' }}</td>
+      <td>
+        {% if round.status == 'DRAFT' %}<span class="badge bg-secondary">Draft</span>
+        {% elif round.status == 'ACTIVE' %}
+          {% if round.is_locked %}<span class="badge bg-info text-dark">Active &mdash; locked, in progress</span>
+          {% else %}<span class="badge bg-success">Active &mdash; open for predictions</span>
+          {% endif %}
+        {% else %}<span class="badge bg-dark">Complete &amp; archived</span>
+        {% endif %}
+      </td>
+      <td><a href="{{ url_for('admin.round_detail', round_id=round.id) }}" class="btn btn-sm btn-outline-primary">Manage fixtures</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="text-muted">No rounds yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if can_create_draft %}
+<div class="card" style="max-width: 30rem;">
+  <div class="card-body">
+    <h5 class="card-title">Prepare the next round</h5>
+    <p class="card-text text-muted small">
+      Created as a draft &mdash; invisible to users until you publish it. You can prepare it
+      now even while another round is still active.
+    </p>
+    <form method="post" action="{{ url_for('admin.create_round') }}">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">
+        <label class="form-label">Name</label>
+        <input type="text" name="name" class="form-control" placeholder="e.g. Group Stage Week 1" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Description <span class="text-muted">(optional)</span></label>
+        <textarea name="description" class="form-control" rows="2" placeholder="e.g. Matches 1-16, 11-15 June"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Create draft round</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info" style="max-width: 40rem;">
+  There's already a draft round being prepared &mdash; finish populating and publish it
+  before creating another.
+  {% for round in rounds if round.status == 'DRAFT' %}
+    <a href="{{ url_for('admin.round_detail', round_id=round.id) }}">Manage {{ round.name }} &raquo;</a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

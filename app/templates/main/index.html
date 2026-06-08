@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<div class="px-4 py-5 text-center">
+  <h1 class="display-5 fw-bold">World Cup 2026 Predictions</h1>
+  <p class="lead">Predict every match score, earn points for the round, and climb the tournament leaderboard with your friends.</p>
+  <div class="d-flex justify-content-center gap-2">
+    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg">Sign up</a>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary btn-lg">Log in</a>
+  </div>
+  <hr class="my-4">
+  <div class="row text-start">
+    <div class="col-md-4">
+      <h5>How scoring works</h5>
+      <ul>
+        <li>Correct result (win/draw): <strong>6 points</strong></li>
+        <li>Exact score: <strong>16 points</strong> (includes the 6)</li>
+        <li>Wrong result: 0 points</li>
+      </ul>
+    </div>
+    <div class="col-md-4">
+      <h5>Rounds</h5>
+      <p>The admin curates each round of fixtures - from group stage weeks through to the Final. Predictions lock 5 minutes before the round's first kick-off.</p>
+    </div>
+    <div class="col-md-4">
+      <h5>Knockout matches</h5>
+      <p>Scored on the 90-minute result. Since knockout games can't end in a draw overall, "correct result" there means picking the team that advances.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

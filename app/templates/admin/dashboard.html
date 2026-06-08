@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1 class="mb-4">Admin</h1>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card text-center"><div class="card-body"><h2>{{ round_count }}</h2><p class="text-muted mb-0">Rounds</p></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body"><h2>{{ fixture_count }}</h2><p class="text-muted mb-0">Fixtures ({{ unassigned_count }} unassigned)</p></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body"><h2>{{ user_count }}</h2><p class="text-muted mb-0">Users</p></div></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">Active round</h5>
+        {% if active_round %}
+          <p class="card-text mb-1"><strong>{{ active_round.name }}</strong> <span class="badge bg-success">ACTIVE</span></p>
+          <p class="card-text text-muted mb-2">
+            {{ active_round.fixtures.count() }} fixture(s) &middot;
+            {% if active_round.is_locked %}locked, results coming in{% else %}locks at {{ active_round.lock_time.strftime('%a %d %b, %H:%M UTC') }}{% endif %}
+          </p>
+          <a href="{{ url_for('admin.round_detail', round_id=active_round.id) }}" class="btn btn-sm btn-outline-primary">Manage &raquo;</a>
+        {% else %}
+          <p class="card-text text-muted mb-0">No round is currently active.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">Draft round</h5>
+        {% if draft_round %}
+          <p class="card-text mb-1"><strong>{{ draft_round.name }}</strong> <span class="badge bg-secondary">DRAFT</span></p>
+          <p class="card-text text-muted mb-2">{{ draft_round.fixtures.count() }} fixture(s) assigned &mdash; not yet visible to users.</p>
+          <a href="{{ url_for('admin.round_detail', round_id=draft_round.id) }}" class="btn btn-sm btn-outline-primary">Prepare &raquo;</a>
+        {% else %}
+          <p class="card-text text-muted mb-0">No draft round being prepared.
+            <a href="{{ url_for('admin.rounds') }}">Create one &raquo;</a>
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex gap-2 mb-4">
+  <a href="{{ url_for('admin.rounds') }}" class="btn btn-primary">Manage rounds</a>
+  <a href="{{ url_for('admin.fixtures') }}" class="btn btn-outline-secondary">All fixtures</a>
+  <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary">Users</a>
+  <a href="{{ url_for('admin.polling') }}" class="btn btn-outline-secondary">Polling activity</a>
+  <form method="post" action="{{ url_for('admin.trigger_sync') }}" class="ms-auto">
+    {{ form.hidden_tag() }}
+    <button type="submit" class="btn btn-success">Sync fixtures &amp; results now</button>
+  </form>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title">Polling status</h5>
+    {% if last_poll %}
+      <p class="card-text mb-1">
+        Last run: <strong>{{ last_poll.run_at.strftime('%a %d %b, %H:%M:%S UTC') }}</strong>
+        &middot; mode: <span class="badge bg-{{ 'secondary' if last_poll.mode == 'daily' else ('info text-dark' if last_poll.mode == 'live' else 'light text-dark border') }}">{{ last_poll.mode }}</span>
+        &middot;
+        {% if last_poll.succeeded %}
+          <span class="badge bg-success">ok</span>
+          &mdash; {{ last_poll.fixtures_created }} created, {{ last_poll.fixtures_updated }} updated, {{ last_poll.fixtures_scored }} (re)scored
+        {% else %}
+          <span class="badge bg-danger">failed</span>
+        {% endif %}
+      </p>
+      {% if last_poll.detail %}<p class="card-text small text-muted mb-0">{{ last_poll.detail }}</p>{% endif %}
+    {% else %}
+      <p class="card-text text-muted mb-0">No polling activity recorded yet.</p>
+    {% endif %}
+    <a href="{{ url_for('admin.polling') }}" class="small">View full polling log &raquo;</a>
+  </div>
+</div>
+
+<p class="text-muted">
+  Fixture sync pulls matches from football-data.org. New fixtures arrive unassigned -
+  use "Manage rounds" to curate which matches belong to each round (essential for the
+  knockout stage, where matchups are only known once earlier rounds finish).
+</p>
+{% endblock %}

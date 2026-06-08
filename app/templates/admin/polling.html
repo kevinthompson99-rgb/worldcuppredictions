@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Polling activity{% endblock %}
+{% block content %}
+<h1 class="mb-1">Polling activity</h1>
+<p class="text-muted mb-4">
+  Last 100 sync runs &mdash; <span class="badge bg-info text-dark">live</span> = 3-minute polls during a match
+  window, <span class="badge bg-secondary">daily</span> = the once-a-day 06:00 UTC sync,
+  <span class="badge bg-light text-dark border">manual</span> = triggered from the admin dashboard.
+</p>
+
+<table class="table table-sm table-striped">
+  <thead><tr><th>Run at (UTC)</th><th>Mode</th><th>Result</th><th>Created</th><th>Updated</th><th>Rescored</th><th>Notes</th></tr></thead>
+  <tbody>
+    {% for log in logs %}
+    <tr>
+      <td><small>{{ log.run_at.strftime('%a %d %b, %H:%M:%S') }}</small></td>
+      <td><span class="badge bg-{{ 'secondary' if log.mode == 'daily' else ('info text-dark' if log.mode == 'live' else 'light text-dark border') }}">{{ log.mode }}</span></td>
+      <td>{% if log.succeeded %}<span class="badge bg-success">ok</span>{% else %}<span class="badge bg-danger">failed</span>{% endif %}</td>
+      <td>{{ log.fixtures_created }}</td>
+      <td>{{ log.fixtures_updated }}</td>
+      <td>{{ log.fixtures_scored }}</td>
+      <td><small class="text-muted">{{ log.detail or '' }}</small></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="text-muted">No polling activity recorded yet &mdash; the live poller only runs during match windows, and the daily sync runs once at 06:00 UTC.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

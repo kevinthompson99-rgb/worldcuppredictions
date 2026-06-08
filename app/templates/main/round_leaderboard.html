@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Round leaderboard{% endblock %}
+{% block content %}
+<h1 class="mb-4">Round leaderboard</h1>
+{% if round %}
+  <p class="text-muted">{{ round.name }}</p>
+  <table class="table table-striped">
+    <thead><tr><th>#</th><th>Player</th><th>Points</th></tr></thead>
+    <tbody>
+      {% for user, points in rows %}
+      <tr {% if user.id == current_user.id %}class="table-primary"{% endif %}>
+        <td>{{ loop.index }}</td>
+        <td>{{ user.username }}</td>
+        <td>{{ points }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a href="{{ url_for('main.round_results', round_id=round.id) }}" class="btn btn-outline-secondary btn-sm">View predictions vs results</a>
+{% else %}
+  <p class="text-muted">No round has started yet.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<h1 class="mb-4">Users</h1>
+<table class="table table-striped">
+  <thead><tr><th>#</th><th>Username</th><th>Email</th><th>Admin?</th><th>Joined</th></tr></thead>
+  <tbody>
+    {% for user in users %}
+    <tr>
+      <td>{{ user.id }}</td>
+      <td>{{ user.username }}</td>
+      <td>{{ user.email }}</td>
+      <td>{% if user.is_admin %}<span class="badge bg-primary">Admin</span>{% endif %}</td>
+      <td>{{ user.created_at.strftime('%d %b %Y') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

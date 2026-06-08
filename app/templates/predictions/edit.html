@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ round.name }} - my predictions{% endblock %}
+{% block content %}
+<h1 class="mb-1">{{ round.name }}</h1>
+<p class="text-muted mb-4">
+  Predict the score for every match. Predictions lock at
+  <strong>{{ round.lock_time.strftime('%a %d %b, %H:%M UTC') }}</strong>
+  (5 minutes before the first kick-off) &mdash; after that, no edits are allowed.
+</p>
+
+<form method="post" novalidate>
+  {{ form.hidden_tag() }}
+  {% for fixture in fixtures %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-5">
+          <strong>{{ fixture.home_team }}</strong> v <strong>{{ fixture.away_team }}</strong><br>
+          <small class="text-muted">
+            {{ fixture.kickoff_at.strftime('%a %d %b, %H:%M UTC') }}
+            {% if fixture.is_knockout %}&middot; knockout (scored on 90-minute result){% endif %}
+          </small>
+        </div>
+        <div class="col-md-7">
+          <div class="row g-2 align-items-center">
+            <div class="col-auto">{{ fixture.home_team }}</div>
+            <div class="col-auto">
+              {{ form["home_" ~ fixture.id](class_="form-control", style="width: 5rem;") }}
+            </div>
+            <div class="col-auto">&ndash;</div>
+            <div class="col-auto">
+              {{ form["away_" ~ fixture.id](class_="form-control", style="width: 5rem;") }}
+            </div>
+            <div class="col-auto">{{ fixture.away_team }}</div>
+          </div>
+          {% for field_name in ["home_" ~ fixture.id, "away_" ~ fixture.id] %}
+            {% for error in form[field_name].errors %}
+              <div class="text-danger small">{{ fixture.home_team if 'home' in field_name else fixture.away_team }}: {{ error }}</div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {{ form.submit(class_="btn btn-primary") }}
+</form>
+{% endblock %}
