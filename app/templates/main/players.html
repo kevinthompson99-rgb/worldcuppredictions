@@ -494,6 +494,14 @@
     cursor: pointer;
     padding: 0;
   }
+  #js-overlay-refresh-btn {
+    background: #000;
+    border-color: #333;
+    color: #ffd166;
+  }
+  #js-overlay-refresh-btn:hover {
+    background: #1a1500;
+  }
   .players-action-icon {
     font-size: 1.05rem;
     line-height: 1;
@@ -529,7 +537,6 @@
     box-sizing: border-box;
     padding: 0.5rem 0.6rem;
     background: #1f242b;
-    border-bottom: 1px solid #262b32;
     border-right: 1px solid #262b32;
     font-size: 0.8rem;
     color: #9aa3ad;
@@ -544,7 +551,6 @@
     z-index: 3;
     overflow: hidden;
     background: #1f242b;
-    border-bottom: 1px solid #262b32;
     /* left and height set by JS */
   }
 
@@ -580,6 +586,7 @@
     z-index: 3;
     overflow: hidden;
     width: var(--pgrid-fix-w);
+    border-top: 1px solid #262b32;
     /* top set by JS */
   }
 
@@ -607,6 +614,7 @@
     bottom: 0;
     overflow: scroll;
     z-index: 1;
+    border-top: 1px solid #262b32;
     /* top and left set by JS */
   }
 
