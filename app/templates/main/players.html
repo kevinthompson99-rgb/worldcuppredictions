@@ -14,7 +14,12 @@
 
     {# ---- Round info, pot & opt-in ---- #}
     <div class="round-card">
-      <div class="round-card-name">{{ round.name }}</div>
+      <div class="round-card-header">
+        <div class="round-card-name">{{ round.name }}</div>
+        {% if locked %}
+          <button id="js-refresh-btn" class="refresh-btn" title="Refresh scores" aria-label="Refresh scores">&#8635;</button>
+        {% endif %}
+      </div>
       {% if locked %}
         <div class="round-card-status">Locked &middot; results update live as matches are played</div>
       {% else %}
@@ -56,10 +61,7 @@
         </p>
       {% endif %}
 
-      <div class="players-grid-heading">
-        <span>{{ users|length }}/{{ total_users }} Players</span>
-        {% if locked %}<button id="js-refresh-btn" class="refresh-btn" title="Refresh scores" aria-label="Refresh scores">&#8635;</button>{% endif %}
-      </div>
+      <div class="players-grid-heading">{{ users|length }}/{{ total_users }} Players</div>
 
       <div class="players-grid-wrap" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
         <table class="players-grid">
@@ -290,9 +292,6 @@
     margin-bottom: 0.75rem;
   }
   .players-grid-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     color: #fff;
     font-weight: 700;
     font-size: 1rem;
@@ -344,6 +343,12 @@
     border: 1px solid #2a2f36;
     border-radius: 0.6rem;
     padding: 0.75rem 1rem;
+  }
+  .round-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
   }
   .round-card-name {
     font-weight: 700;
@@ -421,7 +426,10 @@
     width: 100%;
     overflow: auto;
     max-height: 60vh;
-    -webkit-overflow-scrolling: touch;
+    /* -webkit-overflow-scrolling:touch is intentionally omitted — it offloads
+       scrolling to a GPU compositing layer that bypasses sticky-position tracking,
+       breaking both the frozen header row and the frozen fixture column in Safari PWA.
+       Momentum scrolling is on by default in iOS 13+ so nothing is lost. */
     border: 1px solid #2a2f36;
     border-radius: 0.6rem;
     background: #181b20;
@@ -466,7 +474,9 @@
     z-index: 2;
     text-align: left;
     background: #1f242b;
-    /* Visual boundary between frozen column and scrolling body */
+    /* pan-y: allow vertical scroll gestures on this column but block horizontal
+       ones so the column cannot be dragged away from the left edge on iOS */
+    touch-action: pan-y;
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.35);
   }
 
@@ -479,6 +489,7 @@
     z-index: 4;
     text-align: left;
     background: #1f242b;
+    touch-action: pan-y;
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.35);
   }
 
