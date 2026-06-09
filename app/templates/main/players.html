@@ -266,6 +266,15 @@
       }
       var delay = withOverlay ? Math.max(0, 2000 - (Date.now() - t0)) : 0;
       setTimeout(function () {
+        // If a new app version is ready, activate it now and let the
+        // controllerchange listener (in base.html) reload the page — the
+        // user gets fresh scores and the latest version in one tap. Leave
+        // the spinner/overlay up until the reload happens.
+        var waiting = window.pwaUpdate && window.pwaUpdate.waiting;
+        if (waiting) {
+          waiting.postMessage({ type: 'SKIP_WAITING' });
+          return;
+        }
         isRefreshing = false;
         if (refreshBtn) { refreshBtn.classList.remove('is-spinning'); refreshBtn.disabled = false; }
         if (overlayRefreshBtn) { overlayRefreshBtn.disabled = false; }

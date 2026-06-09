@@ -62,7 +62,7 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// The "Update available" banner on the page sends this once the user accepts
+// The Players page's refresh button sends this when it finds a waiting worker
 // — without it, a waiting worker sits idle until every open tab is closed.
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {

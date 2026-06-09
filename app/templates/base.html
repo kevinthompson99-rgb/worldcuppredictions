@@ -102,50 +102,6 @@
     <small>&copy; {{ current_year }} World Cup Predictions</small>
   </footer>
 
-  {# Shown when a new service worker has installed and is waiting to take over
-     — i.e. a new version has been deployed. Stays out of the way until then. #}
-  <div id="pwa-update-banner" class="pwa-update-banner" hidden>
-    <span>A new version is available.</span>
-    <button type="button" id="pwa-update-refresh" class="btn btn-sm btn-warning">Refresh</button>
-    <button type="button" id="pwa-update-dismiss" class="pwa-update-dismiss" aria-label="Dismiss">&times;</button>
-  </div>
-
-  <style>
-    .pwa-update-banner {
-      position: fixed;
-      left: 0.75rem;
-      right: 0.75rem;
-      bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-      z-index: 1080;
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      max-width: 26rem;
-      margin: 0 auto;
-      background: #1f242b;
-      border: 1px solid #2a2f36;
-      border-radius: 0.6rem;
-      padding: 0.6rem 0.7rem;
-      color: #e9ecef;
-      font-size: 0.85rem;
-      box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
-    }
-    .pwa-update-banner[hidden] {
-      display: none;
-    }
-    .pwa-update-banner span {
-      flex: 1;
-    }
-    .pwa-update-dismiss {
-      background: none;
-      border: none;
-      color: #9aa3ad;
-      font-size: 1.2rem;
-      line-height: 1;
-      padding: 0 0.2rem;
-    }
-  </style>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -163,25 +119,21 @@
   (function () {
     if (!("serviceWorker" in navigator)) return;
 
-    var banner = document.getElementById("pwa-update-banner");
-    var refreshBtn = document.getElementById("pwa-update-refresh");
-    var dismissBtn = document.getElementById("pwa-update-dismiss");
-    var waitingWorker = null;
     var reloading = false;
 
-    function showBanner(worker) {
-      waitingWorker = worker;
-      banner.hidden = false;
-    }
+    // No banner here — a waiting worker is exposed on `window.pwaUpdate` so
+    // the Players page's refresh button can activate it (and reload) as part
+    // of its own refresh tap, instead of prompting separately.
+    window.pwaUpdate = { waiting: null };
 
     // Watch a worker that is currently installing. When it reaches "installed"
     // state and there is already a controller (i.e. this is an update, not a
-    // first install) the update banner is shown.
+    // first install) it's recorded as the waiting worker.
     function trackInstalling(worker) {
       if (!worker) return;
       worker.addEventListener("statechange", function () {
         if (worker.state === "installed" && navigator.serviceWorker.controller) {
-          showBanner(worker);
+          window.pwaUpdate.waiting = worker;
         }
       });
     }
@@ -190,10 +142,10 @@
     // whole app (not just the parts a user happens to land on first) is
     // handled by the worker and stays inside the installed PWA shell.
     navigator.serviceWorker.register("/sw.js", { scope: "/" }).then(function (reg) {
-      // A worker is already waiting (e.g. the user didn't refresh after a
-      // previous deploy's update prompt). Show the banner right away.
+      // A worker is already waiting (e.g. from a previous visit before the
+      // page was refreshed past the update).
       if (reg.waiting) {
-        showBanner(reg.waiting);
+        window.pwaUpdate.waiting = reg.waiting;
         return;
       }
 
@@ -221,17 +173,6 @@
       if (reloading) return;
       reloading = true;
       window.location.reload();
-    });
-
-    refreshBtn.addEventListener("click", function () {
-      if (waitingWorker) {
-        waitingWorker.postMessage({ type: "SKIP_WAITING" });
-      }
-      banner.hidden = true;
-    });
-
-    dismissBtn.addEventListener("click", function () {
-      banner.hidden = true;
     });
   })();
   </script>
