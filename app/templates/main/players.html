@@ -46,11 +46,9 @@
       <a href="{{ url_for('main.leaderboard') }}" class="players-action-tile" title="Leaderboard" aria-label="Leaderboard">
         <span class="players-action-icon">&#127942;</span>
       </a>
-      {% if locked %}
       <button id="js-overlay-refresh-btn" class="players-action-tile" title="Refresh scores" aria-label="Refresh scores">
         <span class="players-action-icon">&#8635;</span>
       </button>
-      {% endif %}
     </div>
 
     {% if not grid %}
@@ -791,7 +789,6 @@
   }
 </style>
 
-{% if locked %}
 <div id="js-refresh-overlay" class="refresh-overlay" role="status" aria-label="Refreshing scores" aria-hidden="true">
   <div class="refresh-spinner">
     <span></span><span></span><span></span><span></span>
@@ -799,5 +796,4 @@
     <span></span><span></span><span></span><span></span>
   </div>
 </div>
-{% endif %}
 {% endblock %}
