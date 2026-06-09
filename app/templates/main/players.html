@@ -136,6 +136,14 @@
   {% endif %}
 </div>
 
+<div id="js-refresh-overlay" class="refresh-overlay" role="status" aria-label="Refreshing scores" aria-hidden="true">
+  <div class="refresh-spinner">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+  </div>
+</div>
+
 <script>
 (function () {
   var cdEl = document.getElementById('js-countdown');
@@ -266,7 +274,10 @@
 
   // Overlay tile button always triggers a full refresh with spinner
   if (overlayRefreshBtn) {
-    overlayRefreshBtn.addEventListener('click', function () { triggerRefresh(true); });
+    overlayRefreshBtn.addEventListener('click', function () {
+      console.log('[refresh] button clicked, overlay el:', overlay, 'isRefreshing:', isRefreshing);
+      triggerRefresh(true);
+    });
   }
 
   // Locked-only: small header button + auto-poll
@@ -360,9 +371,9 @@
         });
       }, { passive: true });
 
-      // Re-run layout when viewport height changes (Safari dynamic address bar)
+      // Re-run layout when container or viewport size changes (Safari dynamic address bar)
       var resizePending = false;
-      function onViewportResize() {
+      function onResize() {
         if (resizePending) { return; }
         resizePending = true;
         requestAnimationFrame(function () {
@@ -370,9 +381,13 @@
           layout();
         });
       }
-      window.addEventListener('resize', onViewportResize, { passive: true });
+      window.addEventListener('resize', onResize, { passive: true });
       if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', onViewportResize, { passive: true });
+        window.visualViewport.addEventListener('resize', onResize, { passive: true });
+      }
+      // ResizeObserver fires whenever pgrid-outer itself changes size (most reliable on iOS)
+      if (window.ResizeObserver) {
+        new ResizeObserver(onResize).observe(outer);
       }
     });
   });
@@ -828,11 +843,4 @@
   }
 </style>
 
-<div id="js-refresh-overlay" class="refresh-overlay" role="status" aria-label="Refreshing scores" aria-hidden="true">
-  <div class="refresh-spinner">
-    <span></span><span></span><span></span><span></span>
-    <span></span><span></span><span></span><span></span>
-    <span></span><span></span><span></span><span></span>
-  </div>
-</div>
 {% endblock %}
