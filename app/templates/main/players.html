@@ -314,9 +314,15 @@
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
       layout();
+      var rafPending = false;
       body.addEventListener('scroll', function () {
-        leftInner.style.transform = 'translateY(-' + body.scrollTop + 'px)';
-        topInner.style.transform  = 'translateX(-' + body.scrollLeft + 'px)';
+        if (rafPending) { return; }
+        rafPending = true;
+        requestAnimationFrame(function () {
+          rafPending = false;
+          leftInner.style.transform = 'translateY(-' + body.scrollTop + 'px)';
+          topInner.style.transform  = 'translateX(-' + body.scrollLeft + 'px)';
+        });
       }, { passive: true });
     });
   });
@@ -539,7 +545,7 @@
     position: absolute;
     left: 0;
     bottom: 0;
-    z-index: 2;
+    z-index: 3;
     overflow: hidden;
     width: var(--pgrid-fix-w);
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.35);
@@ -568,7 +574,7 @@
     position: absolute;
     right: 0;
     bottom: 0;
-    overflow: auto;
+    overflow: scroll;
     z-index: 1;
     /* top and left set by JS */
   }
