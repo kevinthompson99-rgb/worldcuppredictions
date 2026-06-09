@@ -506,11 +506,15 @@
     flex: 0 0 auto;
   }
   /* Footer is omitted entirely on the home/players screen so the grid can
-     occupy the full viewport with no trailing blank space. */
+     occupy the full viewport with no trailing blank space. Note: the footer
+     itself also has class="container", so the flex rule below is scoped to
+     `div.container` only - otherwise its higher specificity (two classes)
+     would override this `display: none` (one class + tag) and the footer's
+     `my-5` margins would eat into the grid's space. */
   body.players-body footer {
     display: none;
   }
-  body.players-body > .container {
+  body.players-body > div.container {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
