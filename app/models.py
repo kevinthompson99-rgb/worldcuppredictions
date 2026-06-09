@@ -137,6 +137,8 @@ class Fixture(db.Model):
 
     home_team = db.Column(db.String(120), nullable=False)
     away_team = db.Column(db.String(120), nullable=False)
+    home_short_name = db.Column(db.String(80), nullable=True)
+    away_short_name = db.Column(db.String(80), nullable=True)
 
     # Free-text descriptors from the API, e.g. stage="GROUP_STAGE", group="Group A".
     stage = db.Column(db.String(64), nullable=True)

@@ -85,13 +85,13 @@
             <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}">
               <div class="fixture-teams js-fixture-teams">
                 {% if row.fixture.is_finished %}
-                  {{ row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_team }}
+                  {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }}
                 {% elif row.fixture.is_live %}
                   {% set h = row.fixture.home_score_90 if row.fixture.home_score_90 is not none else 0 %}
                   {% set a = row.fixture.away_score_90 if row.fixture.away_score_90 is not none else 0 %}
-                  {{ row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_team }}
+                  {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }}
                 {% else %}
-                  {{ row.fixture.home_team | flag }} {{ row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_team }} {{ row.fixture.away_team | flag }}
+                  {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
                 {% endif %}
               </div>
               <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
@@ -333,6 +333,18 @@
 
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
+      var fixCells = leftInner.querySelectorAll('.pgrid-fixture-cell');
+      var maxW = 0;
+      for (var i = 0; i < fixCells.length; i++) {
+        var teamsEl = fixCells[i].querySelector('.fixture-teams');
+        if (!teamsEl) { continue; }
+        var cs = getComputedStyle(fixCells[i]);
+        var w = teamsEl.scrollWidth + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        if (w > maxW) { maxW = w; }
+      }
+      if (maxW > 0) {
+        outer.style.setProperty('--pgrid-fix-w', (maxW + 8) + 'px');
+      }
       layout();
       var rafPending = false;
       body.addEventListener('scroll', function () {
@@ -520,7 +532,7 @@
     margin-top: 0.5rem;
     box-sizing: border-box;
     visibility: hidden;
-    --pgrid-fix-w: 15rem;
+    --pgrid-fix-w: 10rem;
     --pgrid-col-w: 4.5rem;
   }
 
@@ -737,7 +749,6 @@
     .pgrid-outer {
       height: 68vh;
       --pgrid-col-w: 5rem;
-      --pgrid-fix-w: 17rem;
     }
     .fixture-teams {
       font-size: 0.82rem;

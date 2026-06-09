@@ -68,6 +68,8 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
 
         fixture.home_team = match["homeTeam"].get("name") or match["homeTeam"].get("shortName") or "TBD"
         fixture.away_team = match["awayTeam"].get("name") or match["awayTeam"].get("shortName") or "TBD"
+        fixture.home_short_name = match["homeTeam"].get("shortName") or match["homeTeam"].get("name") or "TBD"
+        fixture.away_short_name = match["awayTeam"].get("shortName") or match["awayTeam"].get("name") or "TBD"
         fixture.stage = match.get("stage")
         fixture.group_name = match.get("group")
         fixture.kickoff_at = _parse_kickoff(match["utcDate"])

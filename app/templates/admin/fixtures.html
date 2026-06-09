@@ -13,7 +13,7 @@
     {% for fixture in fixtures %}
     <li class="admin-row">
       <div class="admin-row-head">
-        <span>{{ fixture.home_team | flag }} {{ fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_team }} {{ fixture.away_team | flag }}</span>
+        <span>{{ fixture.home_team | flag }} {{ fixture.home_short_name or fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_short_name or fixture.away_team }} {{ fixture.away_team | flag }}</span>
         {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
       </div>
       <div class="admin-row-meta">
@@ -31,8 +31,8 @@
         </span>
         <select name="winner" class="form-select form-select-sm" style="width: auto; max-width: 9rem;" aria-label="Winner">
           <option value="">winner…</option>
-          <option value="HOME" {{ 'selected' if fixture.winner == 'HOME' }}>{{ fixture.home_team | flag }} {{ fixture.home_team }}</option>
-          <option value="AWAY" {{ 'selected' if fixture.winner == 'AWAY' }}>{{ fixture.away_team | flag }} {{ fixture.away_team }}</option>
+          <option value="HOME" {{ 'selected' if fixture.winner == 'HOME' }}>{{ fixture.home_team | flag }} {{ fixture.home_short_name or fixture.home_team }}</option>
+          <option value="AWAY" {{ 'selected' if fixture.winner == 'AWAY' }}>{{ fixture.away_team | flag }} {{ fixture.away_short_name or fixture.away_team }}</option>
           <option value="DRAW" {{ 'selected' if fixture.winner == 'DRAW' }}>Draw</option>
         </select>
         <div class="form-check">
