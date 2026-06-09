@@ -135,6 +135,8 @@ def players():
         if upcoming else None
     )
 
+    has_live_fixtures = any(f.is_live for f in fixtures)
+
     return render_template(
         "main/players.html",
         round=round_,
@@ -151,6 +153,7 @@ def players():
         stake_amount=round_.stake_amount if round_ is not None else None,
         pot=round_pot(len(users), round_.stake_amount) if round_ is not None else None,
         next_kickoff=next_kickoff,
+        has_live_fixtures=has_live_fixtures,
     )
 
 
@@ -229,6 +232,41 @@ def tournament_leaderboard_view():
 def round_results(round_id):
     # Folded into the players home screen - keep the URL alive for old bookmarks/links.
     return redirect(url_for("main.players"))
+
+
+@bp.route("/scores/live")
+@login_required
+def scores_live():
+    """Lightweight JSON endpoint for pull-to-refresh and HT/FT auto-update on the home screen.
+
+    Returns fixture scores for the active round without requiring the caller to know the
+    round ID. Includes team names so the client can re-render the fixture display in the
+    correct live/FT format without a full page reload.
+    """
+    round_ = get_active_round()
+    if round_ is None or not round_.is_locked:
+        return jsonify(fixtures=[], is_live_window=False)
+
+    fixtures = round_.fixtures.all()
+    has_live = any(f.is_live for f in fixtures)
+
+    return jsonify(
+        is_live_window=has_live,
+        fixtures=[
+            {
+                "id": fixture.id,
+                "status": fixture.status,
+                "is_live": fixture.is_live,
+                "is_finished": fixture.is_finished,
+                "home_score": fixture.home_score_90,
+                "away_score": fixture.away_score_90,
+                "minute": fixture.elapsed_minutes,
+                "home_team": fixture.home_team,
+                "away_team": fixture.away_team,
+            }
+            for fixture in fixtures
+        ],
+    )
 
 
 @bp.route("/rounds/<int:round_id>/live-scores")

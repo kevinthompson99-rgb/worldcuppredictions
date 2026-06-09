@@ -3,6 +3,8 @@
 {% block body_class %}players-body{% endblock %}
 {% block content %}
 <div class="players-page">
+  <div id="js-ptr-indicator" class="ptr-indicator" aria-hidden="true"><div class="ptr-spinner"></div></div>
+
   {% if round is none %}
     <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
   {% else %}
@@ -55,6 +57,10 @@
         </p>
       {% endif %}
 
+      {% if locked %}
+        <p class="players-hint ptr-hint" id="js-ptr-hint"{% if not has_live_fixtures %} style="display:none"{% endif %}>Pull down to refresh scores</p>
+      {% endif %}
+
       <div class="players-grid-heading">{{ users|length }}/{{ total_users }} Players</div>
 
       <div class="players-grid-wrap" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
@@ -76,19 +82,32 @@
           <tbody>
             {% for row in grid %}
               <tr>
-                <th class="fixture-cell" scope="row">
-                  <div class="fixture-teams">{{ row.fixture.home_team | flag }} {{ row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_team }} {{ row.fixture.away_team | flag }}</div>
-                  <div class="fixture-meta js-fixture-meta" data-fixture-id="{{ row.fixture.id }}" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
-                    {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
+                <th class="fixture-cell" scope="row" data-fixture-id="{{ row.fixture.id }}">
+                  <div class="fixture-teams js-fixture-teams">
                     {% if row.fixture.is_finished %}
-                      &middot; <span class="fixture-result">{{ row.fixture.home_score_90 }}&ndash;{{ row.fixture.away_score_90 }}</span>
+                      {{ row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_team }}
                     {% elif row.fixture.is_live %}
-                      &middot; <span class="live-badge">LIVE{% if row.fixture.elapsed_minutes is not none %} {{ row.fixture.elapsed_minutes }}'{% endif %}</span>
+                      {% set h = row.fixture.home_score_90 if row.fixture.home_score_90 is not none else 0 %}
+                      {% set a = row.fixture.away_score_90 if row.fixture.away_score_90 is not none else 0 %}
+                      {{ row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_team }}
+                    {% else %}
+                      {{ row.fixture.home_team | flag }} {{ row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_team }} {{ row.fixture.away_team | flag }}
+                    {% endif %}
+                  </div>
+                  <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
+                    {% if row.fixture.is_finished %}
+                      <span class="fixture-ft">FT</span>
+                    {% elif row.fixture.is_live %}
+                      <span class="live-badge">LIVE</span>{% if row.fixture.elapsed_minutes is not none %} <span class="live-minute">{{ row.fixture.elapsed_minutes }}'</span>{% endif %}
+                    {% else %}
+                      {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
                     {% endif %}
                   </div>
                 </th>
                 {% for cell in row.cells %}
-                  <td class="score-cell{{ ' is-me' if cell.user_id == current_user.id }}{{ ' is-correct' if cell.status in ('correct', 'exact') }}{{ ' is-exact' if cell.status == 'exact' }}">
+                  <td class="score-cell{{ ' is-me' if cell.user_id == current_user.id }}{{ ' is-correct' if cell.status in ('correct', 'exact') }}{{ ' is-exact' if cell.status == 'exact' }}{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
+                      data-fixture-id="{{ row.fixture.id }}"
+                      {% if cell.prediction %}data-predicted-home="{{ cell.prediction.predicted_home }}" data-predicted-away="{{ cell.prediction.predicted_away }}"{% endif %}>
                     {% if cell.status == 'hidden' %}
                       <span class="cell-icon clock-icon" title="Submitted &mdash; hidden until the round locks">&#9201;</span>
                     {% elif cell.status == 'no_pick' %}
@@ -117,10 +136,7 @@
     var target = new Date(cdEl.dataset.kickoff);
     function tick() {
       var diff = target - Date.now();
-      if (diff <= 0) {
-        cdEl.textContent = 'Match in progress';
-        return;
-      }
+      if (diff <= 0) { cdEl.textContent = 'Match in progress'; return; }
       var d = Math.floor(diff / 86400000);
       var h = Math.floor((diff % 86400000) / 3600000);
       var m = Math.floor((diff % 3600000) / 60000);
@@ -135,54 +151,179 @@
 })();
 
 (function () {
-  if (!{{ (round is not none) | tojson }}) { return; }
+  // Score updates only make sense once the round is locked.
+  if (!{{ (round is not none and locked) | tojson }}) { return; }
 
-  // Mirrors the live-poll cadence in app/scheduler.py - no point refreshing faster
-  // than the data underneath us actually changes.
-  var REFRESH_MS = 3 * 60 * 1000;
-  var roundId = {{ round.id | tojson if round else 'null' }};
-  var locked = {{ locked | tojson }};
+  var ptrIndicator = document.getElementById('js-ptr-indicator');
+  var ptrHint = document.getElementById('js-ptr-hint');
+  var gridWrap = document.querySelector('.players-grid-wrap');
+  var isRefreshing = false;
 
-  function escapeHtml(value) {
-    var div = document.createElement('div');
-    div.textContent = value;
-    return div.innerHTML;
+  // Seeded from server-rendered state so the first HT/FT poll has a baseline to diff against.
+  var knownStatuses = {};
+  {% for row in grid %}knownStatuses[{{ row.fixture.id }}] = {{ row.fixture.status | tojson }};
+  {% endfor %}
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
   }
 
-  function refreshScores() {
-    fetch('/rounds/' + roundId + '/live-scores', { headers: { 'Accept': 'application/json' } })
-      .then(function (response) { return response.ok ? response.json() : Promise.reject(response.status); })
-      .then(function (data) {
-        (data.fixtures || []).forEach(function (fixture) {
-          var el = document.querySelector('.js-fixture-meta[data-fixture-id="' + fixture.id + '"]');
-          if (!el) { return; }
-          var html = escapeHtml(el.dataset.kickoff || '');
-          var extra = '';
-          if (fixture.is_finished) {
-            extra = ' &middot; <span class="fixture-result">' + fixture.home_score + '&ndash;' + fixture.away_score + '</span>';
-          } else if (fixture.is_live) {
-            var minute = (fixture.minute === null || fixture.minute === undefined) ? '' : ' ' + fixture.minute + "'";
-            extra = ' &middot; <span class="live-badge">LIVE' + minute + '</span>';
-          }
-          el.innerHTML = html + extra;
+  function updateFixtureDisplay(fixture) {
+    var th = document.querySelector('.fixture-cell[data-fixture-id="' + fixture.id + '"]');
+    if (!th) { return; }
+    var teamsEl = th.querySelector('.js-fixture-teams');
+    var metaEl = th.querySelector('.js-fixture-meta');
+    if (!teamsEl || !metaEl) { return; }
+
+    if (fixture.is_finished) {
+      teamsEl.innerHTML =
+        escapeHtml(fixture.home_team) +
+        ' <span class="fixture-score-result">' + fixture.home_score + ' &ndash; ' + fixture.away_score + '</span> ' +
+        escapeHtml(fixture.away_team);
+      metaEl.innerHTML = '<span class="fixture-ft">FT</span>';
+    } else if (fixture.is_live) {
+      var hs = fixture.home_score !== null ? fixture.home_score : 0;
+      var as_ = fixture.away_score !== null ? fixture.away_score : 0;
+      teamsEl.innerHTML =
+        escapeHtml(fixture.home_team) +
+        ' <span class="fixture-score-live">(' + hs + ') &ndash; (' + as_ + ')</span> ' +
+        escapeHtml(fixture.away_team);
+      var minHtml = (fixture.minute !== null && fixture.minute !== undefined)
+        ? ' <span class="live-minute">' + escapeHtml(fixture.minute) + "'" + '</span>' : '';
+      metaEl.innerHTML = '<span class="live-badge">LIVE</span>' + minHtml;
+    }
+    // Pre-kickoff: leave server-rendered "Flag Name v Name Flag / Date" intact.
+  }
+
+  function updateCellColors(fixture) {
+    if (!fixture.is_live && !fixture.is_finished) { return; }
+    var ah = fixture.home_score;
+    var aa = fixture.away_score;
+    if (ah === null || ah === undefined || aa === null || aa === undefined) { return; }
+    var actualOutcome = ah > aa ? 'H' : aa > ah ? 'A' : 'D';
+    document.querySelectorAll('.score-cell[data-fixture-id="' + fixture.id + '"]').forEach(function (cell) {
+      var ph = cell.dataset.predictedHome;
+      var pa = cell.dataset.predictedAway;
+      if (ph === undefined || pa === undefined) { return; }
+      ph = parseInt(ph, 10);
+      pa = parseInt(pa, 10);
+      if (isNaN(ph) || isNaN(pa)) { return; }
+      var predictedOutcome = ph > pa ? 'H' : pa > ph ? 'A' : 'D';
+      cell.classList.remove('pred-wrong', 'pred-correct', 'pred-exact');
+      if (ph === ah && pa === aa) {
+        cell.classList.add('pred-exact');
+      } else if (predictedOutcome === actualOutcome) {
+        cell.classList.add('pred-correct');
+      } else {
+        cell.classList.add('pred-wrong');
+      }
+    });
+  }
+
+  function fetchScores(callback) {
+    fetch('/scores/live', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (data) { callback(null, data); })
+      .catch(function (err) { callback(err, null); });
+  }
+
+  // Pull-to-refresh: swipe down from the top of the page to fetch the latest scores.
+  (function () {
+    var PTR_THRESHOLD = 60;
+    var startY = 0;
+    var pullDist = 0;
+    var pulling = false;
+
+    function setPtrOpacity(v) {
+      if (ptrIndicator) { ptrIndicator.style.opacity = Math.max(0, Math.min(1, v)); }
+    }
+
+    function triggerRefresh() {
+      if (isRefreshing) { setPtrOpacity(0); return; }
+      isRefreshing = true;
+      if (ptrIndicator) { ptrIndicator.classList.add('is-spinning'); ptrIndicator.style.opacity = 1; }
+      fetchScores(function (err, data) {
+        if (!err && data) {
+          (data.fixtures || []).forEach(function (f) {
+            updateFixtureDisplay(f);
+            updateCellColors(f);
+            knownStatuses[f.id] = f.status;
+          });
+          if (ptrHint && data.is_live_window) { ptrHint.style.display = ''; }
+        }
+        isRefreshing = false;
+        if (ptrIndicator) {
+          ptrIndicator.classList.remove('is-spinning');
+          ptrIndicator.style.opacity = 0;
+        }
+      });
+    }
+
+    // Only activate PTR when both the page and the grid are scrolled to the very top.
+    document.addEventListener('touchstart', function (e) {
+      var gridTop = gridWrap ? gridWrap.scrollTop : 0;
+      if (window.scrollY === 0 && gridTop === 0) {
+        startY = e.touches[0].clientY;
+        pulling = true;
+        pullDist = 0;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (e) {
+      if (!pulling) { return; }
+      pullDist = e.touches[0].clientY - startY;
+      if (pullDist <= 0) { pulling = false; setPtrOpacity(0); return; }
+      setPtrOpacity(pullDist / PTR_THRESHOLD);
+    }, { passive: true });
+
+    document.addEventListener('touchend', function () {
+      if (!pulling) { return; }
+      pulling = false;
+      if (pullDist >= PTR_THRESHOLD) {
+        triggerRefresh();
+      } else {
+        setPtrOpacity(0);
+      }
+      pullDist = 0;
+    }, { passive: true });
+  })();
+
+  // HT/FT auto-push: poll every 30 s but only update the UI when a fixture transitions
+  // to half-time (PAUSED) or full-time (FINISHED) - avoids constant visual churn during
+  // normal play while ensuring everyone sees the key moments without pulling to refresh.
+  setInterval(function () {
+    fetchScores(function (err, data) {
+      if (err || !data) { return; }
+      var needsUpdate = false;
+      (data.fixtures || []).forEach(function (f) {
+        var prev = knownStatuses[f.id];
+        if (prev !== undefined && prev !== f.status && (f.status === 'PAUSED' || f.status === 'FINISHED')) {
+          needsUpdate = true;
+        }
+        knownStatuses[f.id] = f.status;
+      });
+      if (needsUpdate) {
+        (data.fixtures || []).forEach(function (f) {
+          updateFixtureDisplay(f);
+          updateCellColors(f);
         });
-      })
-      .catch(function () { /* transient failure - we'll retry on the next tick */ });
-  }
-
-  // Live score updates only matter once the round has locked - before that
-  // nothing's being played and the endpoint isn't even available (403).
-  if (locked) {
-    setInterval(refreshScores, REFRESH_MS);
-  }
+        if (ptrHint && data.is_live_window) { ptrHint.style.display = ''; }
+      }
+    });
+  }, 30000);
 })();
 </script>
 
 <style>
   /* Dark theme scoped to this page - the grid reads better with high contrast on
-     a dark background, and that's the look we want for the PWA's main screen. */
+     a dark background, and that's the look we want for the PWA's main screen.
+     overscroll-behavior-y: none disables the browser's native pull-to-refresh so
+     our custom PTR gesture takes over cleanly. */
   body.players-body {
     background: #121417;
+    overscroll-behavior-y: none;
   }
   body.players-body .navbar,
   body.players-body footer {
@@ -409,14 +550,58 @@
     font-size: 0.7rem;
     color: #9aa3ad;
   }
-  .fixture-result {
+  .fixture-score-result {
     font-weight: 700;
     color: #e9ecef;
+  }
+  .fixture-score-live {
+    font-weight: 700;
+    color: #ff6b6b;
+  }
+  .fixture-ft {
+    font-weight: 700;
+    color: #adb5bd;
+    letter-spacing: 0.04em;
   }
   .live-badge {
     color: #ff6b6b;
     font-weight: 700;
     letter-spacing: 0.04em;
+  }
+  .live-minute {
+    color: #9aa3ad;
+  }
+  .ptr-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin: 0.25rem 0 0.35rem;
+  }
+  .ptr-indicator {
+    position: fixed;
+    top: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    z-index: 200;
+    pointer-events: none;
+    background: #1f242b;
+    border-radius: 50%;
+    padding: 0.4rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+  .ptr-spinner {
+    width: 1.4rem;
+    height: 1.4rem;
+    border: 2px solid rgba(255, 209, 102, 0.25);
+    border-top-color: #ffd166;
+    border-radius: 50%;
+  }
+  .ptr-indicator.is-spinning .ptr-spinner {
+    animation: ptr-spin 0.7s linear infinite;
+  }
+  @keyframes ptr-spin {
+    to { transform: rotate(360deg); }
   }
 
   .score-cell {
@@ -437,6 +622,19 @@
   .cell-score {
     font-weight: 600;
     color: #e9ecef;
+  }
+  /* Prediction accuracy text colours - applied by JS during live matches and on
+     refresh; also server-rendered for already-finished fixtures on page load. */
+  .score-cell.pred-wrong .cell-score {
+    color: #6c757d;
+    font-weight: 400;
+  }
+  .score-cell.pred-correct .cell-score {
+    color: #74c69d;
+  }
+  .score-cell.pred-exact .cell-score {
+    color: #ffd166;
+    font-weight: 700;
   }
   .cell-empty {
     color: #5a626c;
