@@ -271,7 +271,6 @@
 <style>
   body.players-body {
     background: #121417;
-    overflow-x: hidden;
   }
   body.players-body .navbar,
   body.players-body footer {
@@ -281,7 +280,6 @@
   .players-page {
     color: #e9ecef;
     position: relative;
-    overflow-x: hidden;
   }
   .match-countdown {
     text-align: center;
@@ -413,11 +411,15 @@
     line-height: 1;
   }
 
+  /*
+   * Single scroll container for the grid. This must be the ONLY ancestor
+   * with a non-visible overflow value — any overflow:hidden above this in
+   * the tree breaks position:sticky in Safari/WebKit.
+   */
   .players-grid-wrap {
     margin-top: 0.5rem;
     width: 100%;
-    overflow-x: auto;
-    overflow-y: auto;
+    overflow: auto;
     max-height: 60vh;
     -webkit-overflow-scrolling: touch;
     border: 1px solid #2a2f36;
@@ -425,6 +427,7 @@
     background: #181b20;
     box-sizing: border-box;
   }
+  /* border-collapse:separate is required — sticky doesn't work with collapse */
   .players-grid {
     border-collapse: separate;
     border-spacing: 0;
@@ -440,23 +443,43 @@
     background: #181b20;
   }
 
-  /* Frozen header row (top) and fixture column (left). Both axes are
-     sticky within the single overflow container — no independent scrolling. */
+  /*
+   * Frozen panes — z-index stacking: corner (4) > header row (3) > fixture col (2) > body (auto)
+   * Each sticky cell carries an explicit background so scrolling content doesn't bleed through.
+   * -webkit-sticky is included for PWA standalone mode on older iOS.
+   */
+
+  /* Row 1: player names/avatars — frozen at top */
   .players-grid thead th {
+    position: -webkit-sticky;
     position: sticky;
     top: 0;
     z-index: 3;
     background: #1f242b;
   }
-  .corner-cell, .fixture-cell {
+
+  /* Column A: fixture names — frozen at left */
+  .fixture-cell {
+    position: -webkit-sticky;
     position: sticky;
     left: 0;
     z-index: 2;
     text-align: left;
     background: #1f242b;
+    /* Visual boundary between frozen column and scrolling body */
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.35);
   }
+
+  /* Top-left corner cell: frozen on both axes — overrides thead th z-index */
   .corner-cell {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    left: 0;
     z-index: 4;
+    text-align: left;
+    background: #1f242b;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.35);
   }
 
   .user-cell {
