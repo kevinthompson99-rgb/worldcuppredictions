@@ -109,6 +109,7 @@
         </div>
 
         <div class="pgrid-body" id="pgrid-body">
+          <div class="pgrid-body-inner" id="pgrid-body-inner">
           {% for row in grid %}
           <div class="pgrid-body-row">
             {% for cell in row.cells %}
@@ -129,6 +130,7 @@
             {% endfor %}
           </div>
           {% endfor %}
+          </div>{# /pgrid-body-inner #}
         </div>
 
       </div>
@@ -281,9 +283,22 @@
   var leftWrap  = document.getElementById('pgrid-left');
   var leftInner = document.getElementById('pgrid-left-inner');
   var body      = document.getElementById('pgrid-body');
+  var bodyInner = document.getElementById('pgrid-body-inner');
 
-  if (!outer || !corner || !topWrap || !leftWrap || !body) { return; }
+  if (!outer || !corner || !topWrap || !leftWrap || !body || !bodyInner) { return; }
 
+  // --- Shared scroll state ---
+  var scrollX = 0, scrollY = 0, maxScrollX = 0, maxScrollY = 0;
+
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  function updateTransforms() {
+    topInner.style.transform  = 'translateX(-' + scrollX + 'px)';
+    leftInner.style.transform = 'translateY(-' + scrollY + 'px)';
+    bodyInner.style.transform = 'translate(-' + scrollX + 'px, -' + scrollY + 'px)';
+  }
+
+  // --- Layout: measure corner, position all four panels, sync row heights ---
   function layout() {
     var cw = corner.offsetWidth;
     var ch = corner.offsetHeight;
@@ -295,9 +310,8 @@
     body.style.left      = cw + 'px';
 
     var fixCells = leftInner.children;
-    var bodyRows = body.children;
+    var bodyRows = bodyInner.children;
     var i, n = Math.min(fixCells.length, bodyRows.length);
-
     for (i = 0; i < n; i++) {
       fixCells[i].style.height = '';
       bodyRows[i].style.height = '';
@@ -308,22 +322,106 @@
       bodyRows[i].style.height = rh + 'px';
     }
 
+    // Recompute scroll bounds and re-apply (clamps if container shrank)
+    maxScrollX = Math.max(0, topInner.scrollWidth - topWrap.offsetWidth);
+    maxScrollY = Math.max(0, leftInner.scrollHeight - leftWrap.offsetHeight);
+    scrollX = clamp(scrollX, 0, maxScrollX);
+    scrollY = clamp(scrollY, 0, maxScrollY);
+    updateTransforms();
+
     outer.style.visibility = 'visible';
   }
 
+  // --- Inertia / momentum ---
+  var inertiaDx = 0, inertiaDy = 0, inertiaRaf = null;
+
+  function applyInertia() {
+    inertiaDx *= 0.97;
+    inertiaDy *= 0.97;
+    var doneX = Math.abs(inertiaDx) < 0.5;
+    var doneY = Math.abs(inertiaDy) < 0.5;
+    if (doneX) { inertiaDx = 0; }
+    if (doneY) { inertiaDy = 0; }
+    if (doneX && doneY) { inertiaRaf = null; return; }
+    scrollX = clamp(scrollX + inertiaDx, 0, maxScrollX);
+    scrollY = clamp(scrollY + inertiaDy, 0, maxScrollY);
+    updateTransforms();
+    inertiaRaf = requestAnimationFrame(applyInertia);
+  }
+
+  function stopInertia() {
+    if (inertiaRaf) { cancelAnimationFrame(inertiaRaf); inertiaRaf = null; }
+    inertiaDx = 0; inertiaDy = 0;
+  }
+
+  // --- Touch scroll factory ---
+  // axis 'x': tracks horizontal drag, moves scrollX + topInner + bodyInner
+  // axis 'y': tracks vertical drag, moves scrollY + leftInner + bodyInner
+  function attachTouchScroll(el, axis) {
+    var startCoord = 0, startScroll = 0;
+    var lastCoord = 0, lastTime = 0, vel = 0;
+
+    el.addEventListener('touchstart', function (e) {
+      stopInertia();
+      var t = e.touches[0];
+      startCoord  = axis === 'x' ? t.clientX : t.clientY;
+      startScroll = axis === 'x' ? scrollX : scrollY;
+      lastCoord   = startCoord;
+      lastTime    = Date.now();
+      vel         = 0;
+    }, { passive: true });
+
+    el.addEventListener('touchmove', function (e) {
+      var t     = e.touches[0];
+      var coord = axis === 'x' ? t.clientX : t.clientY;
+      var now   = Date.now();
+      var dt    = now - lastTime;
+      if (dt > 0) { vel = (lastCoord - coord) / dt; } // px/ms, positive = scroll forward
+      lastCoord = coord;
+      lastTime  = now;
+      var delta = startCoord - coord;
+      if (axis === 'x') {
+        scrollX = clamp(startScroll + delta, 0, maxScrollX);
+      } else {
+        scrollY = clamp(startScroll + delta, 0, maxScrollY);
+      }
+      updateTransforms();
+    }, { passive: true });
+
+    el.addEventListener('touchend', function () {
+      // vel is px/ms → multiply by ~16 to get px/frame at 60fps
+      if (axis === 'x') { inertiaDx = vel * 16; } else { inertiaDy = vel * 16; }
+      if (Math.abs(inertiaDx) > 0.5 || Math.abs(inertiaDy) > 0.5) {
+        inertiaRaf = requestAnimationFrame(applyInertia);
+      }
+    }, { passive: true });
+
+    el.addEventListener('touchcancel', function () { vel = 0; }, { passive: true });
+  }
+
+  // pgrid-top drags horizontally; pgrid-left drags vertically
+  attachTouchScroll(topWrap,  'x');
+  attachTouchScroll(leftWrap, 'y');
+
+  // --- Init + resize ---
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
       layout();
-      var rafPending = false;
-      body.addEventListener('scroll', function () {
-        if (rafPending) { return; }
-        rafPending = true;
-        requestAnimationFrame(function () {
-          rafPending = false;
-          leftInner.style.transform = 'translateY(-' + body.scrollTop + 'px)';
-          topInner.style.transform  = 'translateX(-' + body.scrollLeft + 'px)';
-        });
-      }, { passive: true });
+
+      // Re-layout whenever the outer container changes size (dvh reflow on iOS)
+      var resizePending = false;
+      function onResize() {
+        if (resizePending) { return; }
+        resizePending = true;
+        requestAnimationFrame(function () { resizePending = false; layout(); });
+      }
+      window.addEventListener('resize', onResize, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', onResize, { passive: true });
+      }
+      if (window.ResizeObserver) {
+        new ResizeObserver(onResize).observe(outer);
+      }
     });
   });
 })();
@@ -569,14 +667,18 @@
     text-align: left;
   }
 
-  /* Body: main scrollable area */
+  /* Body: clipping container — no native scrolling, content moved via JS transforms */
   .pgrid-body {
     position: absolute;
     right: 0;
     bottom: 0;
-    overflow: scroll;
+    overflow: hidden;
     z-index: 1;
     /* top and left set by JS */
+  }
+
+  .pgrid-body-inner {
+    will-change: transform;
   }
 
   .pgrid-body-row {
