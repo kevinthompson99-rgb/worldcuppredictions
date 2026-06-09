@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block body_class %}about-body{% endblock %}
+{% block content %}
+<div class="about-page">
+  <div class="about-card">
+    <div class="about-name">LEBIM</div>
+    <p class="about-desc">Football Predictions</p>
+    <p class="about-version">Version {{ app_version }}</p>
+  </div>
+</div>
+
+<style>
+  body.about-body {
+    background: #121417;
+  }
+  .about-page {
+    color: #e9ecef;
+    display: flex;
+    justify-content: center;
+    padding-top: 3rem;
+  }
+  .about-card {
+    background: #1f242b;
+    border: 1px solid #2a2f36;
+    border-radius: 0.6rem;
+    padding: 2rem;
+    text-align: center;
+    max-width: 22rem;
+    width: 100%;
+  }
+  .about-name {
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    font-size: 1.6rem;
+    color: #ffd166;
+  }
+  .about-desc {
+    margin: 0.5rem 0 0;
+    color: #9aa3ad;
+    font-size: 0.95rem;
+  }
+  .about-version {
+    margin: 1.5rem 0 0;
+    color: #6c757d;
+    font-size: 0.75rem;
+  }
+</style>
+{% endblock %}

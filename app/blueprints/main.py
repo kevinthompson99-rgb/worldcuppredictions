@@ -88,6 +88,11 @@ def index():
     return render_template("main/index.html")
 
 
+@bp.route("/about")
+def about():
+    return render_template("main/about.html")
+
+
 @bp.route("/players")
 @login_required
 def players():

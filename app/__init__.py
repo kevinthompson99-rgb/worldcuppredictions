@@ -14,6 +14,7 @@ def create_app(config_class=Config):
     # Stamped once at process startup, injected into /sw.js so every deploy (= process
     # restart) produces different SW bytes → browser detects the change automatically.
     app.config["DEPLOY_TIME"] = int(time.time())
+    app.config["APP_VERSION"] = _read_version()
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -42,6 +43,20 @@ def create_app(config_class=Config):
     maybe_start_scheduler(app)
 
     return app
+
+
+def _read_version():
+    """Read the app version from the VERSION file at the project root.
+
+    Single source of truth for the version shown on the About page - bump
+    that file alone for future releases.
+    """
+    version_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "VERSION")
+    try:
+        with open(version_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return "unknown"
 
 
 def run_startup_tasks(app):
@@ -142,7 +157,7 @@ def register_template_helpers(app):
 
     @app.context_processor
     def inject_now():
-        return {"current_year": datetime.utcnow().year}
+        return {"current_year": datetime.utcnow().year, "app_version": app.config["APP_VERSION"]}
 
     @app.template_filter("gbp")
     def format_gbp(amount, signed=False):
