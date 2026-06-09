@@ -3,7 +3,6 @@
 {% block body_class %}players-body{% endblock %}
 {% block content %}
 <div class="players-page">
-  <div id="js-ptr-indicator" class="ptr-indicator" aria-hidden="true"><div class="ptr-spinner"></div></div>
 
   {% if round is none %}
     <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
@@ -57,11 +56,10 @@
         </p>
       {% endif %}
 
-      {% if locked %}
-        <p class="players-hint ptr-hint" id="js-ptr-hint"{% if not has_live_fixtures %} style="display:none"{% endif %}>Pull down to refresh scores</p>
-      {% endif %}
-
-      <div class="players-grid-heading">{{ users|length }}/{{ total_users }} Players</div>
+      <div class="players-grid-heading">
+        <span>{{ users|length }}/{{ total_users }} Players</span>
+        {% if locked %}<button id="js-refresh-btn" class="refresh-btn" title="Refresh scores" aria-label="Refresh scores">&#8635;</button>{% endif %}
+      </div>
 
       <div class="players-grid-wrap" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
         <table class="players-grid">
@@ -151,12 +149,9 @@
 })();
 
 (function () {
-  // Score updates only make sense once the round is locked.
   if (!{{ (round is not none and locked) | tojson }}) { return; }
 
-  var ptrIndicator = document.getElementById('js-ptr-indicator');
-  var ptrHint = document.getElementById('js-ptr-hint');
-  var gridWrap = document.querySelector('.players-grid-wrap');
+  var refreshBtn = document.getElementById('js-refresh-btn');
   var isRefreshing = false;
 
   // Seeded from server-rendered state so the first HT/FT poll has a baseline to diff against.
@@ -194,7 +189,6 @@
         ? ' <span class="live-minute">' + escapeHtml(fixture.minute) + "'" + '</span>' : '';
       metaEl.innerHTML = '<span class="live-badge">LIVE</span>' + minHtml;
     }
-    // Pre-kickoff: leave server-rendered "Flag Name v Name Flag / Date" intact.
   }
 
   function updateCellColors(fixture) {
@@ -229,70 +223,29 @@
       .catch(function (err) { callback(err, null); });
   }
 
-  // Pull-to-refresh: swipe down from the top of the page to fetch the latest scores.
-  (function () {
-    var PTR_THRESHOLD = 60;
-    var startY = 0;
-    var pullDist = 0;
-    var pulling = false;
-
-    function setPtrOpacity(v) {
-      if (ptrIndicator) { ptrIndicator.style.opacity = Math.max(0, Math.min(1, v)); }
-    }
-
-    function triggerRefresh() {
-      if (isRefreshing) { setPtrOpacity(0); return; }
-      isRefreshing = true;
-      if (ptrIndicator) { ptrIndicator.classList.add('is-spinning'); ptrIndicator.style.opacity = 1; }
-      fetchScores(function (err, data) {
-        if (!err && data) {
-          (data.fixtures || []).forEach(function (f) {
-            updateFixtureDisplay(f);
-            updateCellColors(f);
-            knownStatuses[f.id] = f.status;
-          });
-          if (ptrHint && data.is_live_window) { ptrHint.style.display = ''; }
-        }
-        isRefreshing = false;
-        if (ptrIndicator) {
-          ptrIndicator.classList.remove('is-spinning');
-          ptrIndicator.style.opacity = 0;
-        }
-      });
-    }
-
-    // Only activate PTR when both the page and the grid are scrolled to the very top.
-    document.addEventListener('touchstart', function (e) {
-      var gridTop = gridWrap ? gridWrap.scrollTop : 0;
-      if (window.scrollY === 0 && gridTop === 0) {
-        startY = e.touches[0].clientY;
-        pulling = true;
-        pullDist = 0;
+  function triggerRefresh() {
+    if (isRefreshing) { return; }
+    isRefreshing = true;
+    if (refreshBtn) { refreshBtn.classList.add('is-spinning'); refreshBtn.disabled = true; }
+    fetchScores(function (err, data) {
+      if (!err && data) {
+        (data.fixtures || []).forEach(function (f) {
+          updateFixtureDisplay(f);
+          updateCellColors(f);
+          knownStatuses[f.id] = f.status;
+        });
       }
-    }, { passive: true });
+      isRefreshing = false;
+      if (refreshBtn) { refreshBtn.classList.remove('is-spinning'); refreshBtn.disabled = false; }
+    });
+  }
 
-    document.addEventListener('touchmove', function (e) {
-      if (!pulling) { return; }
-      pullDist = e.touches[0].clientY - startY;
-      if (pullDist <= 0) { pulling = false; setPtrOpacity(0); return; }
-      setPtrOpacity(pullDist / PTR_THRESHOLD);
-    }, { passive: true });
-
-    document.addEventListener('touchend', function () {
-      if (!pulling) { return; }
-      pulling = false;
-      if (pullDist >= PTR_THRESHOLD) {
-        triggerRefresh();
-      } else {
-        setPtrOpacity(0);
-      }
-      pullDist = 0;
-    }, { passive: true });
-  })();
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function () { triggerRefresh(); });
+  }
 
   // HT/FT auto-push: poll every 30 s but only update the UI when a fixture transitions
-  // to half-time (PAUSED) or full-time (FINISHED) - avoids constant visual churn during
-  // normal play while ensuring everyone sees the key moments without pulling to refresh.
+  // to half-time (PAUSED) or full-time (FINISHED).
   setInterval(function () {
     fetchScores(function (err, data) {
       if (err || !data) { return; }
@@ -309,7 +262,6 @@
           updateFixtureDisplay(f);
           updateCellColors(f);
         });
-        if (ptrHint && data.is_live_window) { ptrHint.style.display = ''; }
       }
     });
   }, 30000);
@@ -317,13 +269,9 @@
 </script>
 
 <style>
-  /* Dark theme scoped to this page - the grid reads better with high contrast on
-     a dark background, and that's the look we want for the PWA's main screen.
-     overscroll-behavior-y: none disables the browser's native pull-to-refresh so
-     our custom PTR gesture takes over cleanly. */
   body.players-body {
     background: #121417;
-    overscroll-behavior-y: none;
+    overflow-x: hidden;
   }
   body.players-body .navbar,
   body.players-body footer {
@@ -333,6 +281,7 @@
   .players-page {
     color: #e9ecef;
     position: relative;
+    overflow-x: hidden;
   }
   .match-countdown {
     text-align: center;
@@ -343,10 +292,44 @@
     margin-bottom: 0.75rem;
   }
   .players-grid-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     color: #fff;
     font-weight: 700;
     font-size: 1rem;
     margin: 1rem 0 0.5rem;
+  }
+  .refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #1f242b;
+    border: 1px solid #2a2f36;
+    color: #ffd166;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s;
+    transform-origin: center;
+  }
+  .refresh-btn:hover {
+    background: #262c34;
+  }
+  .refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .refresh-btn.is-spinning {
+    animation: refresh-spin 0.7s linear infinite;
+  }
+  @keyframes refresh-spin {
+    to { transform: rotate(360deg); }
   }
   .players-subtitle, .players-muted, .players-hint {
     color: #9aa3ad;
@@ -432,12 +415,15 @@
 
   .players-grid-wrap {
     margin-top: 0.5rem;
-    overflow: auto;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
     max-height: 60vh;
     -webkit-overflow-scrolling: touch;
     border: 1px solid #2a2f36;
     border-radius: 0.6rem;
     background: #181b20;
+    box-sizing: border-box;
   }
   .players-grid {
     border-collapse: separate;
@@ -454,9 +440,8 @@
     background: #181b20;
   }
 
-  /* Sticky header row (scrolls horizontally with users, pinned vertically) and
-     sticky first column (scrolls vertically with fixtures, pinned horizontally) -
-     together they keep both axes' labels in view as the grid scrolls. */
+  /* Frozen header row (top) and fixture column (left). Both axes are
+     sticky within the single overflow container — no independent scrolling. */
   .players-grid thead th {
     position: sticky;
     top: 0;
@@ -492,8 +477,6 @@
     text-overflow: ellipsis;
     max-width: 5.5rem;
   }
-  /* The points "moon" sits tucked into the avatar's bottom-right edge, like a
-     small body orbiting a planet - compact enough not to need its own row. */
   .avatar-orbit {
     position: relative;
     display: inline-block;
@@ -571,38 +554,6 @@
   .live-minute {
     color: #9aa3ad;
   }
-  .ptr-hint {
-    text-align: center;
-    font-size: 0.75rem;
-    color: #6c757d;
-    margin: 0.25rem 0 0.35rem;
-  }
-  .ptr-indicator {
-    position: fixed;
-    top: 0.6rem;
-    left: 50%;
-    transform: translateX(-50%);
-    opacity: 0;
-    z-index: 200;
-    pointer-events: none;
-    background: #1f242b;
-    border-radius: 50%;
-    padding: 0.4rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  }
-  .ptr-spinner {
-    width: 1.4rem;
-    height: 1.4rem;
-    border: 2px solid rgba(255, 209, 102, 0.25);
-    border-top-color: #ffd166;
-    border-radius: 50%;
-  }
-  .ptr-indicator.is-spinning .ptr-spinner {
-    animation: ptr-spin 0.7s linear infinite;
-  }
-  @keyframes ptr-spin {
-    to { transform: rotate(360deg); }
-  }
 
   .score-cell {
     font-size: 0.85rem;
@@ -614,8 +565,6 @@
   .score-cell.is-exact {
     background: rgba(46, 204, 113, 0.4);
   }
-  /* Layered on top of the result colour so "your column" stays visible even when
-     a cell is also highlighted green/exact. */
   .score-cell.is-me {
     box-shadow: inset 0 0 0 9999px rgba(64, 145, 255, 0.16);
   }
@@ -623,8 +572,6 @@
     font-weight: 600;
     color: #e9ecef;
   }
-  /* Prediction accuracy text colours - applied by JS during live matches and on
-     refresh; also server-rendered for already-finished fixtures on page load. */
   .score-cell.pred-wrong .cell-score {
     color: #6c757d;
     font-weight: 400;
