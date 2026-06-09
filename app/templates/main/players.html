@@ -452,45 +452,27 @@
       if (maxW > 0) {
         outer.style.setProperty('--pgrid-fix-w', (maxW + 8) + 'px');
       }
-      layout();
-<<<<<<< HEAD
-      var rafPending = false;
-      body.addEventListener('scroll', function () {
-        if (rafPending) { return; }
-        rafPending = true;
-        requestAnimationFrame(function () {
-          rafPending = false;
-          leftInner.style.transform = 'translateY(-' + body.scrollTop + 'px)';
-          topInner.style.transform  = 'translateX(-' + body.scrollLeft + 'px)';
-        });
-      }, { passive: true });
 
-      // Re-run layout when container or viewport size changes (Safari dynamic address bar)
-=======
+      layout();
+
+      // Fallback: if the corner measured zero size on first pass (layout not
+      // yet settled), retry shortly after.
+      if (corner.offsetWidth === 0 || corner.offsetHeight === 0) {
+        setTimeout(layout, 100);
+      }
 
       // Re-layout whenever the outer container changes size (dvh reflow on iOS)
->>>>>>> dev
       var resizePending = false;
       function onResize() {
         if (resizePending) { return; }
         resizePending = true;
-<<<<<<< HEAD
-        requestAnimationFrame(function () {
-          resizePending = false;
-          layout();
-        });
-=======
         requestAnimationFrame(function () { resizePending = false; layout(); });
->>>>>>> dev
       }
       window.addEventListener('resize', onResize, { passive: true });
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', onResize, { passive: true });
       }
-<<<<<<< HEAD
       // ResizeObserver fires whenever pgrid-outer itself changes size (most reliable on iOS)
-=======
->>>>>>> dev
       if (window.ResizeObserver) {
         new ResizeObserver(onResize).observe(outer);
       }
