@@ -158,12 +158,11 @@
 })();
 
 (function () {
-  if (!{{ (round is not none and locked) | tojson }}) { return; }
-
   var refreshBtn = document.getElementById('js-refresh-btn');
   var overlayRefreshBtn = document.getElementById('js-overlay-refresh-btn');
   var overlay = document.getElementById('js-refresh-overlay');
   var isRefreshing = false;
+  var isLocked = {{ (round is not none and locked) | tojson }};
 
   var knownStatuses = {};
   {% for row in grid %}knownStatuses[{{ row.fixture.id }}] = {{ row.fixture.status | tojson }};
@@ -265,32 +264,36 @@
     });
   }
 
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', function () { triggerRefresh(false); });
-  }
+  // Overlay tile button always triggers a full refresh with spinner
   if (overlayRefreshBtn) {
     overlayRefreshBtn.addEventListener('click', function () { triggerRefresh(true); });
   }
 
-  setInterval(function () {
-    fetchScores(function (err, data) {
-      if (err || !data) { return; }
-      var needsUpdate = false;
-      (data.fixtures || []).forEach(function (f) {
-        var prev = knownStatuses[f.id];
-        if (prev !== undefined && prev !== f.status && (f.status === 'PAUSED' || f.status === 'FINISHED')) {
-          needsUpdate = true;
-        }
-        knownStatuses[f.id] = f.status;
-      });
-      if (needsUpdate) {
+  // Locked-only: small header button + auto-poll
+  if (isLocked) {
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function () { triggerRefresh(false); });
+    }
+    setInterval(function () {
+      fetchScores(function (err, data) {
+        if (err || !data) { return; }
+        var needsUpdate = false;
         (data.fixtures || []).forEach(function (f) {
-          updateFixtureDisplay(f);
-          updateCellColors(f);
+          var prev = knownStatuses[f.id];
+          if (prev !== undefined && prev !== f.status && (f.status === 'PAUSED' || f.status === 'FINISHED')) {
+            needsUpdate = true;
+          }
+          knownStatuses[f.id] = f.status;
         });
-      }
-    });
-  }, 30000);
+        if (needsUpdate) {
+          (data.fixtures || []).forEach(function (f) {
+            updateFixtureDisplay(f);
+            updateCellColors(f);
+          });
+        }
+      });
+    }, 30000);
+  }
 })();
 
 (function () {
@@ -356,6 +359,21 @@
           topInner.style.transform  = 'translateX(-' + body.scrollLeft + 'px)';
         });
       }, { passive: true });
+
+      // Re-run layout when viewport height changes (Safari dynamic address bar)
+      var resizePending = false;
+      function onViewportResize() {
+        if (resizePending) { return; }
+        resizePending = true;
+        requestAnimationFrame(function () {
+          resizePending = false;
+          layout();
+        });
+      }
+      window.addEventListener('resize', onViewportResize, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', onViewportResize, { passive: true });
+      }
     });
   });
 })();
@@ -525,6 +543,7 @@
     position: relative;
     width: 100%;
     height: 60vh;
+    height: 60dvh;
     overflow: hidden;
     border: 1px solid #2a2f36;
     border-radius: 0.6rem;
@@ -748,6 +767,7 @@
   @media (min-width: 768px) {
     .pgrid-outer {
       height: 68vh;
+      height: 68dvh;
       --pgrid-col-w: 5rem;
     }
     .fixture-teams {
