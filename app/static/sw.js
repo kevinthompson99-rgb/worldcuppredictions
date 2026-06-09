@@ -1,6 +1,6 @@
 // Bump this on every deploy that changes the cached shell — a byte-for-byte
 // diff in this file is what makes the browser notice an update is available.
-const CACHE_NAME = "wcp-shell-v1";
+const CACHE_NAME = "wcp-shell-v2";
 
 const APP_SHELL_URLS = [
   "/",

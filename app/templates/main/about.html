@@ -7,6 +7,7 @@
     <div class="about-name">LEBIM</div>
     <p class="about-desc">Football Predictions</p>
     <p class="about-version">Version {{ app_version }}</p>
+    <a class="about-back" href="{{ url_for('main.index') }}">&larr; Back to home</a>
   </div>
 </div>
 
@@ -44,6 +45,17 @@
     margin: 1.5rem 0 0;
     color: #6c757d;
     font-size: 0.75rem;
+  }
+  .about-back {
+    display: inline-block;
+    margin-top: 1.5rem;
+    color: #ffd166;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .about-back:hover {
+    text-decoration: underline;
   }
 </style>
 {% endblock %}

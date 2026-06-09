@@ -272,9 +272,11 @@
         // the spinner/overlay up until the reload happens.
         var waiting = window.pwaUpdate && window.pwaUpdate.waiting;
         if (waiting) {
+          console.log('[refresh] new service worker found, activating update');
           waiting.postMessage({ type: 'SKIP_WAITING' });
           return;
         }
+        console.log('[refresh] no new service worker found, already up to date');
         isRefreshing = false;
         if (refreshBtn) { refreshBtn.classList.remove('is-spinning'); refreshBtn.disabled = false; }
         if (overlayRefreshBtn) { overlayRefreshBtn.disabled = false; }
