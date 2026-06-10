@@ -13,6 +13,7 @@ from app.finance import (
 )
 from app.forms import CSRFForm
 from app.leaderboards import tournament_standings
+from app.teams import flag_for
 from app.models import ROUND_STATUS_DRAFT, Prediction, Round, RoundEntry, User
 from app.round_helpers import get_active_round, get_round_for_leaderboard
 from app.scoring import POINTS_EXACT_SCORE
@@ -269,8 +270,10 @@ def scores_live():
                 "home_score": fixture.home_score_90,
                 "away_score": fixture.away_score_90,
                 "minute": fixture.elapsed_minutes,
-                "home_team": fixture.home_team,
-                "away_team": fixture.away_team,
+                "home_team": fixture.home_short_name or fixture.home_team,
+                "away_team": fixture.away_short_name or fixture.away_team,
+                "home_flag": flag_for(fixture.home_team),
+                "away_flag": flag_for(fixture.away_team),
             }
             for fixture in fixtures
         ],

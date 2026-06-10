@@ -78,11 +78,11 @@
             <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}">
               <div class="fixture-teams js-fixture-teams">
                 {% if row.fixture.is_finished %}
-                  {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }}
+                  {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
                 {% elif row.fixture.is_live %}
                   {% set h = row.fixture.home_score_90 if row.fixture.home_score_90 is not none else 0 %}
                   {% set a = row.fixture.away_score_90 if row.fixture.away_score_90 is not none else 0 %}
-                  {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }}
+                  {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
                 {% else %}
                   {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
                 {% endif %}
@@ -182,17 +182,17 @@
 
     if (fixture.is_finished) {
       teamsEl.innerHTML =
-        escapeHtml(fixture.home_team) +
+        escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-result">' + fixture.home_score + ' &ndash; ' + fixture.away_score + '</span> ' +
-        escapeHtml(fixture.away_team);
+        escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
       metaEl.innerHTML = '<span class="fixture-ft">FT</span>';
     } else if (fixture.is_live) {
       var hs = fixture.home_score !== null ? fixture.home_score : 0;
       var as_ = fixture.away_score !== null ? fixture.away_score : 0;
       teamsEl.innerHTML =
-        escapeHtml(fixture.home_team) +
+        escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-live">(' + hs + ') &ndash; (' + as_ + ')</span> ' +
-        escapeHtml(fixture.away_team);
+        escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
       var minHtml = (fixture.minute !== null && fixture.minute !== undefined)
         ? ' <span class="live-minute">' + escapeHtml(fixture.minute) + "'" + '</span>' : '';
       metaEl.innerHTML = '<span class="live-badge">LIVE</span>' + minHtml;
