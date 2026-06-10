@@ -64,7 +64,7 @@
         <div class="pgrid-top" id="pgrid-top">
           <div class="pgrid-top-inner" id="pgrid-top-inner">
             {% for user in users %}
-            <div class="pgrid-user-cell{{ ' is-me' if user.id == current_user.id }}">
+            <div class="pgrid-user-cell">
               <span class="user-name">{{ user.display_name }}</span>
               <span class="user-points">{{ totals.get(user.id, 0) }}</span>
             </div>
@@ -106,7 +106,7 @@
           {% for row in grid %}
           <div class="pgrid-body-row">
             {% for cell in row.cells %}
-            <div class="score-cell{{ ' is-me' if cell.user_id == current_user.id }}{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
+            <div class="score-cell{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
                  data-fixture-id="{{ row.fixture.id }}"
                  {% if cell.prediction %}data-predicted-home="{{ cell.prediction.predicted_home }}" data-predicted-away="{{ cell.prediction.predicted_away }}"{% endif %}>
               {% if cell.status == 'hidden' %}
@@ -704,10 +704,6 @@
     gap: 0.15rem;
   }
 
-  .pgrid-user-cell.is-me {
-    background: #233447;
-  }
-
   /* Left column: fixed at left, clips and syncs vertically */
   .pgrid-left {
     position: absolute;
@@ -829,9 +825,6 @@
     justify-content: center;
     font-size: 0.85rem;
     position: relative;
-  }
-  .score-cell.is-me {
-    box-shadow: inset 0 0 0 9999px rgba(64, 145, 255, 0.16);
   }
   .cell-score {
     font-weight: 600;
