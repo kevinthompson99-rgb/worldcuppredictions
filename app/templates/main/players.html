@@ -106,7 +106,7 @@
           {% for row in grid %}
           <div class="pgrid-body-row">
             {% for cell in row.cells %}
-            <div class="score-cell{{ ' is-me' if cell.user_id == current_user.id }}{{ ' is-correct' if cell.status in ('correct', 'exact') }}{{ ' is-exact' if cell.status == 'exact' }}{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
+            <div class="score-cell{{ ' is-me' if cell.user_id == current_user.id }}{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
                  data-fixture-id="{{ row.fixture.id }}"
                  {% if cell.prediction %}data-predicted-home="{{ cell.prediction.predicted_home }}" data-predicted-away="{{ cell.prediction.predicted_away }}"{% endif %}>
               {% if cell.status == 'hidden' %}
@@ -115,9 +115,6 @@
                 <span class="cell-empty" title="No prediction submitted">&ndash;</span>
               {% else %}
                 <span class="cell-score">{{ cell.prediction.predicted_home }}&ndash;{{ cell.prediction.predicted_away }}</span>
-                {% if cell.status == 'exact' %}
-                  <span class="cell-icon star-icon" title="Exact score">&#9733;</span>
-                {% endif %}
               {% endif %}
             </div>
             {% endfor %}
@@ -833,21 +830,15 @@
     font-size: 0.85rem;
     position: relative;
   }
-  .score-cell.is-correct {
-    background: rgba(46, 204, 113, 0.22);
-  }
-  .score-cell.is-exact {
-    background: rgba(46, 204, 113, 0.4);
-  }
   .score-cell.is-me {
     box-shadow: inset 0 0 0 9999px rgba(64, 145, 255, 0.16);
   }
   .cell-score {
     font-weight: 600;
-    color: #e9ecef;
+    color: #fff;
   }
   .score-cell.pred-wrong .cell-score {
-    color: #6c757d;
+    color: #adb5bd;
     font-weight: 400;
   }
   .score-cell.pred-correct .cell-score {
@@ -865,9 +856,6 @@
   }
   .clock-icon {
     color: #f0b429;
-  }
-  .star-icon {
-    color: #ffd43b;
   }
 
   @media (min-width: 768px) {
