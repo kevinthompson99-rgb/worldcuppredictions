@@ -147,6 +147,101 @@ def register_cli(app):
         click.echo(f"{verb} superuser '{user.username}' <{user.email}>.")
         click.echo("Done.")
 
+    @app.cli.command("seed-test-data")
+    def seed_test_data():
+        """Seed two opted-in test players with predictions and one finished result.
+
+        For local/dev use against the active round only - creates/updates "Alice" and
+        "Bruno" (password "test123"), opts them into the active round, gives both a
+        random prediction (0-3) for every fixture, marks the round's first fixture as
+        finished 2-1, and rescores so points show up in the players grid. Idempotent -
+        safe to run again to re-roll the random predictions.
+        """
+        if os.environ.get("FLASK_ENV") == "production":
+            click.echo("Refusing to run: FLASK_ENV=production.")
+            return
+
+        import random
+
+        from app.extensions import db
+        from app.models import OUTCOME_AWAY, OUTCOME_DRAW, OUTCOME_HOME, Prediction, RoundEntry, User
+        from app.round_helpers import get_active_round
+        from app.scoring import score_fixture
+
+        round_ = get_active_round()
+        if round_ is None:
+            click.echo("No active round - nothing to seed.")
+            return
+
+        users = []
+        for username, display_name, email in (
+            ("alice_test", "Alice", "alice.test@example.com"),
+            ("bruno_test", "Bruno", "bruno.test@example.com"),
+        ):
+            user = User.query.filter_by(username=username).first()
+            if user is None:
+                user = User(username=username, display_name=display_name, email=email)
+                db.session.add(user)
+            user.display_name = display_name
+            user.email = email
+            user.set_password("test123")
+            users.append(user)
+        db.session.flush()
+
+        for user in users:
+            entry = RoundEntry.query.filter_by(user_id=user.id, round_id=round_.id).first()
+            if entry is None:
+                entry = RoundEntry(user_id=user.id, round_id=round_.id, opted_in=True)
+                db.session.add(entry)
+            else:
+                entry.opted_in = True
+
+        fixtures = round_.fixtures.all()
+        for user in users:
+            for fixture in fixtures:
+                prediction = Prediction.query.filter_by(user_id=user.id, fixture_id=fixture.id).first()
+                if prediction is None:
+                    prediction = Prediction(user_id=user.id, fixture_id=fixture.id, predicted_home=0, predicted_away=0)
+                    db.session.add(prediction)
+                prediction.predicted_home = random.randint(0, 3)
+                prediction.predicted_away = random.randint(0, 3)
+
+        db.session.commit()
+
+        click.echo(f"Seeded users: {', '.join(u.display_name for u in users)} (password: test123)")
+        click.echo(f"Opted both into '{round_.name}' and seeded {len(fixtures)} prediction(s) each.")
+
+        if not fixtures:
+            click.echo(f"{round_.name} has no fixtures - nothing to score.")
+            return
+
+        # First fixture (by kickoff) becomes the simulated result, e.g. Mexico 2-1
+        # South Africa - flip the scores if South Africa is listed as the home side
+        # so the team named "South Africa" keeps the losing scoreline either way.
+        first = fixtures[0]
+        home_score, away_score = 2, 1
+        if first.home_team and "south africa" in first.home_team.lower():
+            home_score, away_score = away_score, home_score
+
+        first.home_score_90 = home_score
+        first.away_score_90 = away_score
+        first.status = "FINISHED"
+        if home_score > away_score:
+            first.winner = OUTCOME_HOME
+        elif away_score > home_score:
+            first.winner = OUTCOME_AWAY
+        else:
+            first.winner = OUTCOME_DRAW
+        db.session.commit()
+
+        updated = score_fixture(first)
+        db.session.commit()
+
+        click.echo(
+            f"Marked '{first.home_team} {first.home_score_90}-{first.away_score_90} "
+            f"{first.away_team}' as finished and rescored {updated} prediction(s)."
+        )
+
 
 def register_template_helpers(app):
     from datetime import datetime
