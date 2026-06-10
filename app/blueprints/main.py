@@ -114,6 +114,9 @@ def players():
     if round_ is not None:
         entrant_ids = {entry.user_id for entry in round_.entries.filter_by(opted_in=True)}
         users = [user for user in User.query.order_by(User.display_name.asc()).all() if user.id in entrant_ids]
+        # The logged-in user's column always comes first, then everyone else
+        # alphabetically (the query above already sorts by display_name).
+        users.sort(key=lambda user: user.id != current_user.id)
 
     predictions = {}
     if fixtures:

@@ -8,26 +8,16 @@
     <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
   {% else %}
 
-    {% if next_kickoff %}
-      <div id="js-countdown" class="match-countdown" data-kickoff="{{ next_kickoff }}"></div>
-    {% endif %}
-
     <div class="round-card">
-      <div class="round-card-header">
-        <div class="round-card-name">{{ round.name }}</div>
-        {% if locked %}
-          <button id="js-refresh-btn" class="refresh-btn" title="Refresh scores" aria-label="Refresh scores">&#8635;</button>
-        {% endif %}
+      <div class="round-card-row">
+        <span class="round-card-name">{{ round.name }}</span>
+        <span class="round-card-deadline">
+          {% if locked %}Locked{% else %}Deadline {{ round.lock_time | london('%a %d %b, %H:%M %Z') }}{% endif %}
+        </span>
       </div>
-      {% if locked %}
-        <div class="round-card-status">Locked &middot; results update live as matches are played</div>
-      {% else %}
-        <div class="round-card-status">
-          Predictions lock <strong>{{ round.lock_time | london('%a %d %b, %H:%M %Z') }}</strong>
-        </div>
-      {% endif %}
-      <div class="round-card-pot">
-        <span class="pot-amount">Pot: {{ pot | gbp }}</span>
+      <div class="round-card-row">
+        <span class="round-card-pot">Pot {{ pot | gbp }}</span>
+        <span class="round-card-players">{{ users|length }}/{{ total_users }} Players</span>
       </div>
       {% if opt_in_open and opt_in_form %}
         <form method="post" action="{{ url_for('main.round_opt_in') }}" class="opt-in-form">
@@ -39,16 +29,21 @@
       {% endif %}
     </div>
 
-    <div class="players-actions">
-      <a href="{{ url_for('predictions.my_predictions') }}" class="players-action-tile" title="My predictions" aria-label="My predictions">
-        <span class="players-action-icon">&#9999;&#65039;</span>
-      </a>
-      <a href="{{ url_for('main.leaderboard') }}" class="players-action-tile" title="Leaderboard" aria-label="Leaderboard">
-        <span class="players-action-icon">&#127942;</span>
-      </a>
-      <button id="js-overlay-refresh-btn" class="players-action-tile" title="Refresh scores" aria-label="Refresh scores">
-        <span class="players-action-icon">&#8635;</span>
-      </button>
+    <div class="players-toolbar">
+      {% if next_kickoff %}
+        <div id="js-countdown" class="match-countdown" data-kickoff="{{ next_kickoff }}"></div>
+      {% endif %}
+      <div class="players-actions">
+        <a href="{{ url_for('predictions.my_predictions') }}" class="players-action-tile" title="My predictions" aria-label="My predictions">
+          <span class="players-action-icon">&#9999;&#65039;</span>
+        </a>
+        <a href="{{ url_for('main.leaderboard') }}" class="players-action-tile" title="Leaderboard" aria-label="Leaderboard">
+          <span class="players-action-icon">&#127942;</span>
+        </a>
+        <button id="js-overlay-refresh-btn" class="players-action-tile" title="Refresh scores" aria-label="Refresh scores">
+          <span class="players-action-icon">&#8635;</span>
+        </button>
+      </div>
     </div>
 
     {% if not grid %}
@@ -60,8 +55,6 @@
           Join this round above to take part in the {{ stake_amount | gbp }} pot &mdash; you'll need to before you can enter predictions.
         </p>
       {% endif %}
-
-      <div class="players-grid-heading">{{ users|length }}/{{ total_users }} Players</div>
 
       {# Four-panel JS-sync grid: corner + top row + left column + scrollable body #}
       <div class="pgrid-outer" id="pgrid-outer" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
@@ -168,7 +161,6 @@
 })();
 
 (function () {
-  var refreshBtn = document.getElementById('js-refresh-btn');
   var overlayRefreshBtn = document.getElementById('js-overlay-refresh-btn');
   var overlay = document.getElementById('js-refresh-overlay');
   var isRefreshing = false;
@@ -254,7 +246,6 @@
     isRefreshing = true;
     var t0 = Date.now();
     if (withOverlay) { showOverlay(); }
-    if (refreshBtn) { refreshBtn.classList.add('is-spinning'); refreshBtn.disabled = true; }
     if (overlayRefreshBtn) { overlayRefreshBtn.disabled = true; }
     fetchScores(function (err, data) {
       if (!err && data) {
@@ -278,7 +269,6 @@
         }
         console.log('[refresh] no new service worker found, already up to date');
         isRefreshing = false;
-        if (refreshBtn) { refreshBtn.classList.remove('is-spinning'); refreshBtn.disabled = false; }
         if (overlayRefreshBtn) { overlayRefreshBtn.disabled = false; }
         if (withOverlay) { hideOverlay(); }
       }, delay);
@@ -293,11 +283,8 @@
     });
   }
 
-  // Locked-only: small header button + auto-poll
+  // Locked-only: poll for status changes (HT/FT) and refresh the display in place
   if (isLocked) {
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', function () { triggerRefresh(false); });
-    }
     setInterval(function () {
       fetchScores(function (err, data) {
         if (err || !data) { return; }
@@ -542,49 +529,18 @@
     flex-direction: column;
   }
   .match-countdown {
-    text-align: center;
     color: #ffd166;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.03em;
-    margin-bottom: 0.75rem;
+    white-space: nowrap;
   }
-  .players-grid-heading {
-    color: #fff;
-    font-weight: 700;
-    font-size: 1rem;
-    margin: 1rem 0 0.5rem;
-  }
-  .refresh-btn {
-    display: inline-flex;
+  .players-toolbar {
+    margin-top: 0.5rem;
+    display: flex;
     align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: #1f242b;
-    border: 1px solid #2a2f36;
-    color: #ffd166;
-    font-size: 1.15rem;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0;
-    transition: background 0.15s;
-    transform-origin: center;
-  }
-  .refresh-btn:hover {
-    background: #262c34;
-  }
-  .refresh-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-  .refresh-btn.is-spinning {
-    animation: refresh-spin 0.7s linear infinite;
-  }
-  @keyframes refresh-spin {
-    to { transform: rotate(360deg); }
+    justify-content: space-between;
+    gap: 0.5rem;
   }
   .players-subtitle, .players-muted, .players-hint {
     color: #9aa3ad;
@@ -594,44 +550,40 @@
     margin-top: 1rem;
   }
   .players-hint {
-    margin: 0.75rem 0 0.5rem;
+    margin: 0.5rem 0;
   }
   .round-card {
     background: #1f242b;
     border: 1px solid #2a2f36;
     border-radius: 0.6rem;
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
   }
-  .round-card-header {
+  .round-card-row {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
     gap: 0.5rem;
+  }
+  .round-card-row + .round-card-row {
+    margin-top: 0.3rem;
   }
   .round-card-name {
     font-weight: 700;
     color: #fff;
     font-size: 1.05rem;
   }
-  .round-card-status {
-    margin-top: 0.2rem;
+  .round-card-deadline {
     font-size: 0.8rem;
     color: #9aa3ad;
+    text-align: right;
   }
   .round-card-pot {
-    margin-top: 0.6rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.5rem;
-  }
-  .pot-amount {
     font-weight: 700;
     color: #ffd166;
     font-size: 1rem;
   }
-  .pot-detail {
-    font-size: 0.75rem;
+  .round-card-players {
+    font-size: 0.8rem;
     color: #9aa3ad;
   }
   .opt-in-form {
@@ -649,10 +601,10 @@
     color: #ffd166;
   }
   .players-actions {
-    margin-top: 0.6rem;
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
+    margin-left: auto;
   }
   .players-action-tile {
     display: inline-flex;
@@ -711,7 +663,7 @@
     left: 0;
     z-index: 4;
     width: var(--pgrid-fix-w);
-    height: 4rem;
+    height: 3rem;
     display: flex;
     align-items: center;
     box-sizing: border-box;
@@ -742,16 +694,16 @@
   .pgrid-user-cell {
     flex-shrink: 0;
     width: var(--pgrid-col-w);
-    height: 4rem;
+    height: 3rem;
     box-sizing: border-box;
-    padding: 0.5rem 0.4rem;
+    padding: 0.35rem 0.4rem;
     border-right: 1px solid #262b32;
     background: #1f242b;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
+    gap: 0.15rem;
   }
 
   .pgrid-user-cell.is-me {
