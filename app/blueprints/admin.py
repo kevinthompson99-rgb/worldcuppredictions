@@ -243,6 +243,28 @@ def complete_round(round_id):
     return redirect(url_for("admin.rounds"))
 
 
+@bp.route("/rounds/<int:round_id>/force-lock", methods=["POST"])
+def force_lock_round(round_id):
+    """Dev/testing only: immediately lock a round, bypassing its kick-off-based lock_time."""
+    form = CSRFForm()
+    if not form.validate_on_submit():
+        abort(400, description="Invalid or missing CSRF token.")
+
+    round_ = Round.query.get_or_404(round_id)
+    if round_.status != ROUND_STATUS_ACTIVE:
+        flash(f"'{round_.name}' isn't active - it can't be force-locked.", "danger")
+        return redirect(url_for("admin.round_detail", round_id=round_id))
+
+    if round_.is_locked:
+        flash(f"'{round_.name}' is already locked.", "info")
+        return redirect(url_for("admin.round_detail", round_id=round_id))
+
+    round_.force_locked = True
+    db.session.commit()
+    flash(f"'{round_.name}' is now force-locked - predictions are closed.", "success")
+    return redirect(url_for("admin.round_detail", round_id=round_id))
+
+
 @bp.route("/rounds/<int:round_id>/assign", methods=["POST"])
 def assign_fixtures(round_id):
     """Bulk-assign the fixtures the admin checked on the round management page."""

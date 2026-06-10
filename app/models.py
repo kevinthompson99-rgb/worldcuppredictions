@@ -76,6 +76,9 @@ class Round(db.Model):
     stake_amount = db.Column(db.Numeric(8, 2), nullable=False, default=DEFAULT_STAKE_AMOUNT)
     status = db.Column(db.String(16), nullable=False, default=ROUND_STATUS_DRAFT, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Dev/testing escape hatch: lets an admin lock a round on demand, bypassing the
+    # kick-off-based lock_time below. See admin.force_lock_round.
+    force_locked = db.Column(db.Boolean, nullable=False, default=False)
 
     fixtures = db.relationship(
         "Fixture",
@@ -107,6 +110,8 @@ class Round(db.Model):
 
     @property
     def is_locked(self):
+        if self.force_locked:
+            return True
         lock_time = self.lock_time
         return lock_time is not None and datetime.utcnow() >= lock_time
 

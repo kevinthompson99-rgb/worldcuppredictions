@@ -43,7 +43,14 @@
           <button type="submit" class="btn btn-dark btn-sm" {% if not round.is_locked %}disabled{% endif %}>Mark as complete &amp; archive</button>
         </form>
         {% if not round.is_locked %}
+          <form method="post" action="{{ url_for('admin.force_lock_round', round_id=round.id) }}" class="d-inline">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-outline-warning btn-sm">Force Lock</button>
+          </form>
           <p class="text-muted small mt-2 mb-0">This round must lock (predictions close) before it can be marked complete.</p>
+          <p class="text-muted small mt-1 mb-0">
+            <strong>Force Lock</strong> immediately locks this round for testing, regardless of kick-off times.
+          </p>
         {% elif not round.all_fixtures_settled %}
           <p class="text-warning small mt-2 mb-0">Not every fixture has a final score yet &mdash; you can still complete it, but double-check results first.</p>
         {% endif %}
