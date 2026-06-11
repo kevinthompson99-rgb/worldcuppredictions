@@ -225,10 +225,24 @@
   }
 
   function fetchScores(callback) {
-    fetch('/scores/live', { headers: { 'Accept': 'application/json' } })
+    // Hard timeout so a slow/hanging request on prod can't block the caller forever.
+    var controller = new AbortController();
+    var timedOut = false;
+    var timeoutId = setTimeout(function () {
+      timedOut = true;
+      controller.abort();
+    }, 5000);
+
+    fetch('/scores/live', { headers: { 'Accept': 'application/json' }, signal: controller.signal })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function (data) { callback(null, data); })
-      .catch(function (err) { callback(err, null); });
+      .then(function (data) {
+        clearTimeout(timeoutId);
+        callback(null, data);
+      })
+      .catch(function (err) {
+        clearTimeout(timeoutId);
+        callback(timedOut ? new Error('timeout') : err, null);
+      });
   }
 
   function showOverlay() {
@@ -242,34 +256,63 @@
     if (isRefreshing) { return; }
     isRefreshing = true;
     var t0 = Date.now();
+    var finished = false;
+
+    function finish() {
+      if (finished) { return; }
+      finished = true;
+      clearTimeout(fallbackTimer);
+      isRefreshing = false;
+      if (overlayRefreshBtn) { overlayRefreshBtn.disabled = false; }
+      if (withOverlay) { hideOverlay(); }
+    }
+
     if (withOverlay) { showOverlay(); }
     if (overlayRefreshBtn) { overlayRefreshBtn.disabled = true; }
-    fetchScores(function (err, data) {
-      if (!err && data) {
-        (data.fixtures || []).forEach(function (f) {
-          updateFixtureDisplay(f);
-          updateCellColors(f);
-          knownStatuses[f.id] = f.status;
-        });
-      }
-      var delay = withOverlay ? Math.max(0, 2000 - (Date.now() - t0)) : 0;
-      setTimeout(function () {
-        // If a new app version is ready, activate it now and let the
-        // controllerchange listener (in base.html) reload the page — the
-        // user gets fresh scores and the latest version in one tap. Leave
-        // the spinner/overlay up until the reload happens.
-        var waiting = window.pwaUpdate && window.pwaUpdate.waiting;
-        if (waiting) {
-          console.log('[refresh] new service worker found, activating update');
-          waiting.postMessage({ type: 'SKIP_WAITING' });
-          return;
+
+    // Belt-and-braces: force-dismiss the spinner even if fetchScores' own
+    // 5s AbortController timeout never fires its callback for some reason.
+    var fallbackTimer = setTimeout(function () {
+      console.log('[refresh] fallback timeout reached, forcing spinner dismiss');
+      finish();
+    }, 6000);
+
+    try {
+      fetchScores(function (err, data) {
+        try {
+          if (!err && data) {
+            (data.fixtures || []).forEach(function (f) {
+              updateFixtureDisplay(f);
+              updateCellColors(f);
+              knownStatuses[f.id] = f.status;
+            });
+          } else if (err) {
+            console.log('[refresh] fetchScores failed:', err);
+          }
+        } catch (e) {
+          console.log('[refresh] error applying refreshed scores:', e);
+        } finally {
+          var delay = withOverlay ? Math.max(0, 2000 - (Date.now() - t0)) : 0;
+          setTimeout(function () {
+            // If a new app version is ready, activate it now and let the
+            // controllerchange listener (in base.html) reload the page — the
+            // user gets fresh scores and the latest version in one tap. Leave
+            // the spinner/overlay up until the reload happens.
+            var waiting = window.pwaUpdate && window.pwaUpdate.waiting;
+            if (waiting) {
+              console.log('[refresh] new service worker found, activating update');
+              waiting.postMessage({ type: 'SKIP_WAITING' });
+              return;
+            }
+            console.log('[refresh] no new service worker found, already up to date');
+            finish();
+          }, delay);
         }
-        console.log('[refresh] no new service worker found, already up to date');
-        isRefreshing = false;
-        if (overlayRefreshBtn) { overlayRefreshBtn.disabled = false; }
-        if (withOverlay) { hideOverlay(); }
-      }, delay);
-    });
+      });
+    } catch (e) {
+      console.log('[refresh] fetchScores threw synchronously:', e);
+      finish();
+    }
   }
 
   // Overlay tile button always triggers a full refresh with spinner
