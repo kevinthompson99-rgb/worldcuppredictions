@@ -90,8 +90,10 @@
               <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
                 {% if row.fixture.is_finished %}
                   <span class="fixture-ft">FT</span>
+                {% elif row.fixture.status == 'PAUSED' %}
+                  <span class="live-badge live-badge-ht">HT</span>
                 {% elif row.fixture.is_live %}
-                  <span class="live-badge">{{ 'HT' if row.fixture.status == 'PAUSED' else 'LIVE' }}</span>
+                  <span class="live-badge live-badge-live">LIVE</span>
                 {% else %}
                   {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
                 {% endif %}
@@ -193,8 +195,11 @@
         escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-live">(' + hs + ') &ndash; (' + as_ + ')</span> ' +
         escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
-      var label = fixture.status === 'PAUSED' ? 'HT' : 'LIVE';
-      metaEl.innerHTML = '<span class="live-badge">' + label + '</span>';
+      if (fixture.status === 'PAUSED') {
+        metaEl.innerHTML = '<span class="live-badge live-badge-ht">HT</span>';
+      } else {
+        metaEl.innerHTML = '<span class="live-badge live-badge-live">LIVE</span>';
+      }
     }
   }
 
@@ -842,13 +847,18 @@
   }
   .fixture-ft {
     font-weight: 700;
-    color: #adb5bd;
+    color: #fff;
     letter-spacing: 0.04em;
   }
   .live-badge {
-    color: #ff6b6b;
     font-weight: 700;
     letter-spacing: 0.04em;
+  }
+  .live-badge-live {
+    color: #51cf66;
+  }
+  .live-badge-ht {
+    color: #ffd43b;
   }
 
   .score-cell {
