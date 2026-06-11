@@ -69,6 +69,10 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
             fixture = Fixture(external_id=external_id)
             db.session.add(fixture)
 
+        old_status = fixture.status
+        old_home_score = fixture.home_score_90
+        old_away_score = fixture.away_score_90
+
         fixture.home_team = match["homeTeam"].get("name") or match["homeTeam"].get("shortName") or "TBD"
         fixture.away_team = match["awayTeam"].get("name") or match["awayTeam"].get("shortName") or "TBD"
         fixture.home_short_name = match["homeTeam"].get("shortName") or match["homeTeam"].get("name") or "TBD"
@@ -76,14 +80,7 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
         fixture.stage = match.get("stage")
         fixture.group_name = match.get("group")
         fixture.kickoff_at = _parse_kickoff(match["utcDate"])
-        api_status = match.get("status", fixture.status)
-        if api_status in Fixture._LIVE_STATUSES or api_status in Fixture._FINISHED_STATUSES:
-            logger.info(
-                "Sync: fixture %s (%s v %s) API status=%s (was %s)",
-                fixture.external_id, fixture.home_team, fixture.away_team,
-                api_status, fixture.status,
-            )
-        fixture.status = api_status
+        fixture.status = match.get("status", fixture.status)
         fixture.is_knockout = fixture.stage in _KNOCKOUT_STAGES
         fixture.last_synced_at = datetime.utcnow()
 
@@ -96,6 +93,14 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
 
             if score.get("duration") and score["duration"] != "REGULAR":
                 flagged_for_review.append(fixture)
+
+        if not is_new:
+            logger.info(
+                "Sync: fixture %s (%s v %s) status %s -> %s, score %s-%s -> %s-%s",
+                fixture.external_id, fixture.home_team, fixture.away_team,
+                old_status, fixture.status,
+                old_home_score, old_away_score, fixture.home_score_90, fixture.away_score_90,
+            )
 
         if is_new:
             created += 1
