@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 
@@ -11,6 +12,11 @@ from config import Config
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # Root logger defaults to WARNING, which would silently drop the INFO-level
+    # sync/scheduler/poll logging (app.sync, app.scheduler, etc. - all children of
+    # this "app" logger) that the live-score polling relies on for diagnostics.
+    app.logger.setLevel(logging.INFO)
     # Stamped once at process startup, injected into /sw.js so every deploy (= process
     # restart) produces different SW bytes → browser detects the change automatically.
     app.config["DEPLOY_TIME"] = int(time.time())
@@ -40,9 +46,24 @@ def create_app(config_class=Config):
     register_cli(app)
     register_template_helpers(app)
     run_startup_tasks(app)
+    _reenable_app_loggers()
     maybe_start_scheduler(app)
 
     return app
+
+
+def _reenable_app_loggers():
+    """Undo Alembic's `disable_existing_loggers` fallout from `run_startup_tasks`.
+
+    `flask_migrate.upgrade()` runs Alembic's `fileConfig`, which (by its default
+    `disable_existing_loggers=True`) disables every logger that already exists at
+    that point - including `app.sync`/`app.scheduler`, since those modules are
+    imported via blueprint registration before migrations run. Without this, their
+    live-poll diagnostic logging is silently dropped for the lifetime of the process.
+    """
+    for name, logger in logging.Logger.manager.loggerDict.items():
+        if isinstance(logger, logging.Logger) and (name == "app" or name.startswith("app.")):
+            logger.disabled = False
 
 
 def _read_version():
