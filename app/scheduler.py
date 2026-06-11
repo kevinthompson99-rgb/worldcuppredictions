@@ -56,12 +56,6 @@ def get_live_window(app, now=None):
     return start, end
 
 
-def is_in_live_window(app, now=None):
-    now = now or datetime.utcnow()
-    window = get_live_window(app, now)
-    return window is not None and window[0] <= now <= window[1]
-
-
 def _record_poll(mode, summary=None, error=None):
     log = PollLog(mode=mode)
     if error is not None:
@@ -84,7 +78,18 @@ def _record_poll(mode, summary=None, error=None):
 def _run_live_poll(app):
     with app.app_context():
         now = datetime.utcnow()
-        if not is_in_live_window(app, now):
+        window = get_live_window(app, now)
+        in_window = window is not None and window[0] <= now <= window[1]
+
+        if window is not None:
+            logger.info(
+                "Live poll tick: now=%s UTC, window=%s..%s UTC, in_window=%s",
+                now.isoformat(), window[0].isoformat(), window[1].isoformat(), in_window,
+            )
+        else:
+            logger.info("Live poll tick: now=%s UTC, no fixtures today, in_window=False", now.isoformat())
+
+        if not in_window:
             return
 
         logger.info("Live poll: in today's match window, fetching today's results")
