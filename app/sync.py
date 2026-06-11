@@ -8,15 +8,12 @@ are decided in regulation) and flag any fixture where `score.duration != REGULAR
 admin can manually correct the 90-minute score from the admin panel.
 """
 
-import logging
 from datetime import datetime, timezone
 
 from app.extensions import db
 from app.football_data import get_world_cup_matches
 from app.models import Fixture, OUTCOME_AWAY, OUTCOME_DRAW, OUTCOME_HOME
 from app.scoring import score_fixture
-
-logger = logging.getLogger(__name__)
 
 _API_WINNER_TO_OUTCOME = {
     "HOME_TEAM": OUTCOME_HOME,
