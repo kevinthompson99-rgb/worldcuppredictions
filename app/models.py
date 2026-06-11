@@ -174,11 +174,22 @@ class Fixture(db.Model):
 
     # football-data.org statuses while a match is being played - used to drive the
     # live-score display on the results page (see main.round_results / round_live_scores).
-    _LIVE_STATUSES = ("IN_PLAY", "PAUSED")
+    # SUSPENDED (e.g. weather delay) is treated as still "live" - the match isn't over.
+    _LIVE_STATUSES = ("IN_PLAY", "PAUSED", "SUSPENDED")
+
+    # AWARDED covers matches decided without (full) play, e.g. a forfeit - these carry a
+    # final score just like FINISHED. football-data.org's `score.fullTime` can be populated
+    # with the *current* score while a match is still IN_PLAY, so `is_finished` must key off
+    # `status` rather than just score presence.
+    _FINISHED_STATUSES = ("FINISHED", "AWARDED")
 
     @property
     def is_finished(self):
-        return self.home_score_90 is not None and self.away_score_90 is not None
+        return (
+            self.status in self._FINISHED_STATUSES
+            and self.home_score_90 is not None
+            and self.away_score_90 is not None
+        )
 
     @property
     def is_live(self):

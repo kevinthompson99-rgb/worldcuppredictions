@@ -259,6 +259,14 @@ def scores_live():
     fixtures = round_.fixtures.all()
     has_live = any(f.is_live for f in fixtures)
 
+    for fixture in fixtures:
+        if fixture.is_live or fixture.status in fixture._FINISHED_STATUSES:
+            current_app.logger.info(
+                "/scores/live: fixture %s status=%s is_live=%s is_finished=%s score=%s-%s",
+                fixture.id, fixture.status, fixture.is_live, fixture.is_finished,
+                fixture.home_score_90, fixture.away_score_90,
+            )
+
     return jsonify(
         is_live_window=has_live,
         fixtures=[
