@@ -269,7 +269,6 @@ def scores_live():
                 "is_finished": fixture.is_finished,
                 "home_score": fixture.home_score_90,
                 "away_score": fixture.away_score_90,
-                "minute": fixture.elapsed_minutes,
                 "home_team": fixture.home_short_name or fixture.home_team,
                 "away_team": fixture.away_short_name or fixture.away_team,
                 "home_flag": flag_for(fixture.home_team),

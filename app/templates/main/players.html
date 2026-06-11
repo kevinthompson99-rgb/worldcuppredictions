@@ -91,7 +91,7 @@
                 {% if row.fixture.is_finished %}
                   <span class="fixture-ft">FT</span>
                 {% elif row.fixture.is_live %}
-                  <span class="live-badge">LIVE</span>{% if row.fixture.elapsed_minutes is not none %} <span class="live-minute">{{ row.fixture.elapsed_minutes }}'</span>{% endif %}
+                  <span class="live-badge">{{ 'HT' if row.fixture.status == 'PAUSED' else 'LIVE' }}</span>
                 {% else %}
                   {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
                 {% endif %}
@@ -193,9 +193,8 @@
         escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-live">(' + hs + ') &ndash; (' + as_ + ')</span> ' +
         escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
-      var minHtml = (fixture.minute !== null && fixture.minute !== undefined)
-        ? ' <span class="live-minute">' + escapeHtml(fixture.minute) + "'" + '</span>' : '';
-      metaEl.innerHTML = '<span class="live-badge">LIVE</span>' + minHtml;
+      var label = fixture.status === 'PAUSED' ? 'HT' : 'LIVE';
+      metaEl.innerHTML = '<span class="live-badge">' + label + '</span>';
     }
   }
 
@@ -850,9 +849,6 @@
     color: #ff6b6b;
     font-weight: 700;
     letter-spacing: 0.04em;
-  }
-  .live-minute {
-    color: #9aa3ad;
   }
 
   .score-cell {
