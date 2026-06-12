@@ -277,6 +277,56 @@ def register_cli(app):
             )
         click.echo(f"Rescored {total_updated} prediction(s) across {min(len(fixtures), len(RESULTS))} fixture(s).")
 
+    @app.cli.command("reset-dev")
+    def reset_dev():
+        """Wipe the dev database back to a clean slate: no rounds, no players, no predictions.
+
+        Deletes all predictions, round entries, rounds, and non-admin users, and resets
+        every fixture's score/status back to a not-yet-played state - then re-seeds the
+        admin account. Refuses to run with FLASK_ENV=production.
+        """
+        if os.environ.get("FLASK_ENV") == "production":
+            click.echo("Refusing to run: FLASK_ENV=production.")
+            return
+
+        from app.extensions import db
+        from app.models import Fixture, Prediction, Round, RoundEntry, User
+
+        predictions_count = Prediction.query.delete()
+        round_entries_count = RoundEntry.query.delete()
+
+        # Fixtures reference rounds via round_id - clear that (and flush) before
+        # deleting rounds, or the DELETE will violate the foreign key constraint.
+        fixtures = Fixture.query.all()
+        for fixture in fixtures:
+            fixture.round_id = None
+            fixture.home_score_90 = None
+            fixture.away_score_90 = None
+            fixture.winner = None
+            fixture.status = "TIMED"
+            fixture.last_synced_at = None
+        db.session.flush()
+
+        rounds_count = Round.query.delete()
+        users_count = User.query.filter_by(is_admin=False).delete()
+
+        db.session.commit()
+
+        user, created = _seed_admin(app)
+
+        click.echo("Reset dev database:")
+        click.echo(f"  Deleted {predictions_count} prediction(s).")
+        click.echo(f"  Deleted {round_entries_count} round entry/entries.")
+        click.echo(f"  Deleted {rounds_count} round(s).")
+        click.echo(f"  Deleted {users_count} non-admin user(s).")
+        click.echo(f"  Reset {len(fixtures)} fixture(s) to TIMED with scores cleared and unassigned from rounds.")
+        if user is None:
+            click.echo("  ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD must all be set - admin user not seeded.")
+        else:
+            verb = "Created" if created else "Verified"
+            click.echo(f"  {verb} admin user '{user.username}' <{user.email}>.")
+        click.echo("Done.")
+
 
 def register_template_helpers(app):
     from datetime import datetime
