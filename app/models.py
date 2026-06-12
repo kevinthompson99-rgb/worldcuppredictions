@@ -176,6 +176,12 @@ class Fixture(db.Model):
     # live-score display on the results page (see main.round_results / round_live_scores).
     _LIVE_STATUSES = ("IN_PLAY", "PAUSED")
 
+    # Assumed match duration (90 minutes + stoppage time/breaks) - mirrors
+    # config.LIVE_POLL_ASSUMED_MATCH_MINUTES. Used to derive the LIVE/FT display and
+    # "Match in progress" countdown purely from kick-off time, so they stay in sync
+    # without depending on the API status field (which can lag or be wrong).
+    LIVE_WINDOW_MINUTES = 105
+
     @property
     def is_finished(self):
         return self.home_score_90 is not None and self.away_score_90 is not None
@@ -183,6 +189,16 @@ class Fixture(db.Model):
     @property
     def is_live(self):
         return self.status in self._LIVE_STATUSES
+
+    @property
+    def kickoff_has_passed(self):
+        return datetime.utcnow() >= self.kickoff_at
+
+    @property
+    def is_live_by_time(self):
+        """Whether we're within the assumed live window: kick-off to kick-off + 105 min."""
+        now = datetime.utcnow()
+        return self.kickoff_at <= now < self.kickoff_at + timedelta(minutes=self.LIVE_WINDOW_MINUTES)
 
     @property
     def elapsed_minutes(self):

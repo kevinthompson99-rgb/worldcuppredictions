@@ -30,8 +30,8 @@
     </div>
 
     <div class="players-toolbar">
-      {% if next_kickoff %}
-        <div id="js-countdown" class="match-countdown" data-kickoff="{{ next_kickoff }}"></div>
+      {% if fixtures %}
+        <div id="js-countdown" class="match-countdown"></div>
       {% endif %}
       <div class="players-actions">
         <a href="{{ url_for('predictions.my_predictions') }}" class="players-action-tile" title="My predictions" aria-label="My predictions">
@@ -79,7 +79,7 @@
               <div class="fixture-teams js-fixture-teams">
                 {% if row.fixture.is_finished %}
                   {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
-                {% elif row.fixture.is_live %}
+                {% elif row.fixture.is_live_by_time %}
                   {% set h = row.fixture.home_score_90 if row.fixture.home_score_90 is not none else 0 %}
                   {% set a = row.fixture.away_score_90 if row.fixture.away_score_90 is not none else 0 %}
                   {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
@@ -88,11 +88,11 @@
                 {% endif %}
               </div>
               <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
-                {% if row.fixture.is_finished %}
+                {% if row.fixture.is_finished or (row.fixture.kickoff_has_passed and not row.fixture.is_live_by_time) %}
                   <span class="fixture-ft">FT</span>
                 {% elif row.fixture.status == 'PAUSED' %}
                   <span class="live-badge live-badge-ht">HT</span>
-                {% elif row.fixture.is_live %}
+                {% elif row.fixture.is_live_by_time %}
                   <span class="live-badge live-badge-live">LIVE</span>
                 {% else %}
                   {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
@@ -139,13 +139,22 @@
 </div>
 
 <script>
+// Assumed match duration (kick-off to kick-off + this many ms) - shared by the
+// countdown and the per-fixture LIVE/FT display so both stay in sync purely from
+// stored kick-off times, with no dependency on the API status field.
+var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
+
 (function () {
   var cdEl = document.getElementById('js-countdown');
   if (cdEl) {
-    var target = new Date(cdEl.dataset.kickoff);
+    var kickoffs = {{ fixture_kickoffs | tojson }}.map(function (s) { return new Date(s).getTime(); });
     function tick() {
-      var diff = target - Date.now();
-      if (diff <= 0) { cdEl.textContent = 'Match in progress'; return; }
+      var now = Date.now();
+      var anyLive = kickoffs.some(function (k) { return now >= k && now < k + LIVE_WINDOW_MS; });
+      if (anyLive) { cdEl.textContent = 'Match in progress'; return; }
+      var future = kickoffs.filter(function (k) { return k > now; });
+      if (!future.length) { cdEl.textContent = ''; return; }
+      var diff = Math.min.apply(null, future) - now;
       var d = Math.floor(diff / 86400000);
       var h = Math.floor((diff % 86400000) / 3600000);
       var m = Math.floor((diff % 3600000) / 60000);
@@ -165,10 +174,6 @@
   var isRefreshing = false;
   var isLocked = {{ (round is not none and locked) | tojson }};
 
-  var knownStatuses = {};
-  {% for row in grid %}knownStatuses[{{ row.fixture.id }}] = {{ row.fixture.status | tojson }};
-  {% endfor %}
-
   function escapeHtml(s) {
     var d = document.createElement('div');
     d.textContent = String(s);
@@ -182,13 +187,17 @@
     var metaEl = th.querySelector('.js-fixture-meta');
     if (!teamsEl || !metaEl) { return; }
 
+    var now = Date.now();
+    var kickoff = new Date(fixture.kickoff_at).getTime();
+    var isLiveByTime = now >= kickoff && now < kickoff + LIVE_WINDOW_MS;
+
     if (fixture.is_finished) {
       teamsEl.innerHTML =
         escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-result">' + fixture.home_score + ' &ndash; ' + fixture.away_score + '</span> ' +
         escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
       metaEl.innerHTML = '<span class="fixture-ft">FT</span>';
-    } else if (fixture.is_live) {
+    } else if (isLiveByTime) {
       var hs = fixture.home_score !== null ? fixture.home_score : 0;
       var as_ = fixture.away_score !== null ? fixture.away_score : 0;
       teamsEl.innerHTML =
@@ -200,6 +209,8 @@
       } else {
         metaEl.innerHTML = '<span class="live-badge live-badge-live">LIVE</span>';
       }
+    } else if (now >= kickoff) {
+      metaEl.innerHTML = '<span class="fixture-ft">FT</span>';
     }
   }
 
@@ -288,7 +299,6 @@
             (data.fixtures || []).forEach(function (f) {
               updateFixtureDisplay(f);
               updateCellColors(f);
-              knownStatuses[f.id] = f.status;
             });
           } else if (err) {
             console.log('[refresh] fetchScores failed:', err);
@@ -327,25 +337,17 @@
     });
   }
 
-  // Locked-only: poll for status changes (HT/FT) and refresh the display in place
+  // Locked-only: poll and refresh the display in place. updateFixtureDisplay is
+  // purely time-based for LIVE/FT, so this also picks up kick-off/window
+  // transitions even when the API status hasn't changed.
   if (isLocked) {
     setInterval(function () {
       fetchScores(function (err, data) {
         if (err || !data) { return; }
-        var needsUpdate = false;
         (data.fixtures || []).forEach(function (f) {
-          var prev = knownStatuses[f.id];
-          if (prev !== undefined && prev !== f.status && (f.status === 'PAUSED' || f.status === 'FINISHED')) {
-            needsUpdate = true;
-          }
-          knownStatuses[f.id] = f.status;
+          updateFixtureDisplay(f);
+          updateCellColors(f);
         });
-        if (needsUpdate) {
-          (data.fixtures || []).forEach(function (f) {
-            updateFixtureDisplay(f);
-            updateCellColors(f);
-          });
-        }
       });
     }, 30000);
   }

@@ -138,11 +138,10 @@ def players():
 
     standings = tournament_standings()
 
-    upcoming = [f for f in fixtures if not f.is_finished and not f.is_live]
-    next_kickoff = (
-        min(upcoming, key=lambda f: f.kickoff_at).kickoff_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-        if upcoming else None
-    )
+    # All kick-off times for the round, for the JS countdown - it works out which
+    # match (if any) is currently in its live window and which is next purely from
+    # these timestamps, see players.html.
+    fixture_kickoffs = [f.kickoff_at.strftime("%Y-%m-%dT%H:%M:%SZ") for f in fixtures]
 
     has_live_fixtures = any(f.is_live for f in fixtures)
 
@@ -161,7 +160,7 @@ def players():
         opt_in_form=opt_in_form,
         stake_amount=round_.stake_amount if round_ is not None else None,
         pot=round_pot(len(users), round_.stake_amount) if round_ is not None else None,
-        next_kickoff=next_kickoff,
+        fixture_kickoffs=fixture_kickoffs,
         has_live_fixtures=has_live_fixtures,
     )
 
@@ -267,6 +266,7 @@ def scores_live():
                 "status": fixture.status,
                 "is_live": fixture.is_live,
                 "is_finished": fixture.is_finished,
+                "kickoff_at": fixture.kickoff_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "home_score": fixture.home_score_90,
                 "away_score": fixture.away_score_90,
                 "home_team": fixture.home_short_name or fixture.home_team,
