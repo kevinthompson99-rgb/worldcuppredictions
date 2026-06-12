@@ -226,11 +226,16 @@ var matchCountdown = (function () {
   }
 
   function updateTotals(totals) {
-    if (!totals) { return; }
-    document.querySelectorAll('.pgrid-user-cell[data-user-id]').forEach(function (cell) {
+    console.log('[updateTotals] called with totals:', totals);
+    if (!totals) { console.log('[updateTotals] no totals in response, bailing'); return; }
+    var cells = document.querySelectorAll('.pgrid-user-cell[data-user-id]');
+    console.log('[updateTotals] found', cells.length, '.pgrid-user-cell[data-user-id] element(s)');
+    cells.forEach(function (cell) {
       var uid = cell.dataset.userId;
       var pointsEl = cell.querySelector('.user-points');
+      console.log('[updateTotals] cell uid:', uid, 'pointsEl:', pointsEl, 'totals[uid]:', totals[uid], 'hasOwnProperty:', Object.prototype.hasOwnProperty.call(totals, uid));
       if (pointsEl && Object.prototype.hasOwnProperty.call(totals, uid)) {
+        console.log('[updateTotals] updating uid', uid, 'from', pointsEl.textContent, 'to', totals[uid]);
         pointsEl.textContent = totals[uid];
       }
     });
