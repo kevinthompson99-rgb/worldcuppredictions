@@ -93,7 +93,7 @@
                 {% elif row.fixture.status == 'PAUSED' %}
                   <span class="live-badge live-badge-ht">HT</span>
                 {% elif row.fixture.is_live_minute %}
-                  <span class="live-badge live-badge-live">{{ row.fixture.minute_display }}</span>
+                  <span class="live-badge live-badge-live">{{ row.fixture.minute_display or 'LIVE' }}</span>
                 {% else %}
                   {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
                 {% endif %}
@@ -191,7 +191,7 @@ var matchCountdown = (function () {
   }
 
   function minuteText(fixture) {
-    if (fixture.minute === null || fixture.minute === undefined) { return ''; }
+    if (fixture.minute === null || fixture.minute === undefined) { return 'LIVE'; }
     if (fixture.injury_time) { return fixture.minute + '+' + fixture.injury_time + "'"; }
     return fixture.minute + "'";
   }

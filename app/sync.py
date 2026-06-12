@@ -104,6 +104,14 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
                 old_home_score, old_away_score, fixture.home_score_90, fixture.away_score_90,
             )
 
+        if fixture.is_live:
+            logger.info(
+                "Sync: fixture %s (%s v %s) live - status=%s minute=%r injuryTime=%r (raw API minute=%r injuryTime=%r)",
+                fixture.external_id, fixture.home_team, fixture.away_team,
+                fixture.status, fixture.current_minute, fixture.current_injury_time,
+                match.get("minute"), match.get("injuryTime"),
+            )
+
         if is_new:
             created += 1
         else:
@@ -117,8 +125,15 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
     # as the score changes during play, and finished fixtures get their final score.
     for fixture in touched_fixtures:
         if fixture.home_score_90 is not None and fixture.away_score_90 is not None:
-            if score_fixture(fixture) > 0:
+            updated = score_fixture(fixture)
+            if updated > 0:
                 scored_fixtures += 1
+            if fixture.is_live or fixture.is_finished:
+                logger.info(
+                    "Sync: rescored fixture %s (%s v %s) %s-%s (status=%s) -> %d prediction(s) updated",
+                    fixture.external_id, fixture.home_team, fixture.away_team,
+                    fixture.home_score_90, fixture.away_score_90, fixture.status, updated,
+                )
 
     db.session.commit()
 
