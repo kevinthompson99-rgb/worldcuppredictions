@@ -45,7 +45,7 @@ class Config:
     LIVE_POLL_PRE_KICKOFF_MINUTES = 15
     LIVE_POLL_POST_FINAL_MINUTES = 30
     LIVE_POLL_ASSUMED_MATCH_MINUTES = 105  # 90 minutes + stoppage time/breaks, per spec
-    LIVE_POLL_INTERVAL_MINUTES = 3
+    LIVE_POLL_INTERVAL_SECONDS = 30
 
     # Outside live windows, a lightweight daily sync runs once at this UTC hour.
     DAILY_SYNC_HOUR_UTC = 6

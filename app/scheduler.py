@@ -2,12 +2,12 @@
 
   - During a "live match window" - 15 minutes before the day's earliest kick-off
     through (assumed match length + 30 minutes) after the day's latest kick-off -
-    poll the API every 3 minutes for that day's matches only.
+    poll the API every 30 seconds for that day's matches only.
   - Outside live windows, run one lightweight full sync per day at 06:00 UTC to
     pick up fixture changes and newly confirmed knockout matchups.
 
 Implemented with APScheduler's BackgroundScheduler running inside the Flask process:
-one job ticks every 3 minutes and only does work if "now" falls in today's live
+one job ticks every 30 seconds and only does work if "now" falls in today's live
 window; a second job runs on a daily cron trigger. Every run - live or daily, and
 whether or not it found anything - is recorded in `PollLog` so the admin panel can
 show when polling last ran and what it found.
@@ -32,16 +32,45 @@ logger = logging.getLogger(__name__)
 _scheduler = None
 
 
+def _live_window_end_buffer_minutes(app):
+    """How long after a kick-off a match's live window can still extend."""
+    return app.config["LIVE_POLL_ASSUMED_MATCH_MINUTES"] + app.config["LIVE_POLL_POST_FINAL_MINUTES"]
+
+
+def _relevant_dates(app, now):
+    """The UTC date(s) whose fixtures could be in their live window right now.
+
+    Normally just `now`'s date. A late kick-off's live window (kick-off +
+    LIVE_POLL_ASSUMED_MATCH_MINUTES + LIVE_POLL_POST_FINAL_MINUTES) can cross the UTC
+    midnight boundary in either direction, so when `now` is within that many minutes
+    of midnight the adjacent day's fixtures are included too - e.g. a 23:00 UTC
+    kick-off has a window ending at 01:15 UTC the next day, and must keep being
+    polled until then.
+    """
+    today = now.date()
+    buffer_ = timedelta(minutes=_live_window_end_buffer_minutes(app))
+    midnight = datetime.combine(today, datetime.min.time())
+
+    start_date, end_date = today, today
+    if now - midnight < buffer_:
+        start_date = today - timedelta(days=1)
+    if (midnight + timedelta(days=1)) - now < buffer_:
+        end_date = today + timedelta(days=1)
+
+    return start_date, end_date
+
+
 def _todays_fixtures(app, now):
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = start_of_day + timedelta(days=1)
+    start_date, end_date = _relevant_dates(app, now)
+    start = datetime.combine(start_date, datetime.min.time())
+    end = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
     return Fixture.query.filter(
-        Fixture.kickoff_at >= start_of_day, Fixture.kickoff_at < end_of_day
+        Fixture.kickoff_at >= start, Fixture.kickoff_at < end
     ).all()
 
 
 def get_live_window(app, now=None):
-    """Return (start, end) for today's live match window, or None if no matches today."""
+    """Return (start, end) for the current live match window, or None if no relevant matches."""
     now = now or datetime.utcnow()
     fixtures = _todays_fixtures(app, now)
     if not fixtures:
@@ -50,9 +79,7 @@ def get_live_window(app, now=None):
     earliest = min(f.kickoff_at for f in fixtures)
     latest = max(f.kickoff_at for f in fixtures)
     start = earliest - timedelta(minutes=app.config["LIVE_POLL_PRE_KICKOFF_MINUTES"])
-    end = latest + timedelta(
-        minutes=app.config["LIVE_POLL_ASSUMED_MATCH_MINUTES"] + app.config["LIVE_POLL_POST_FINAL_MINUTES"]
-    )
+    end = latest + timedelta(minutes=_live_window_end_buffer_minutes(app))
     return start, end
 
 
@@ -93,9 +120,9 @@ def _run_live_poll(app):
             return
 
         logger.info("Live poll: in today's match window, fetching today's results")
-        today = now.strftime("%Y-%m-%d")
+        start_date, end_date = _relevant_dates(app, now)
         try:
-            summary = sync_fixtures_and_results(date_from=today, date_to=today)
+            summary = sync_fixtures_and_results(date_from=start_date.isoformat(), date_to=end_date.isoformat())
         except Exception as exc:
             logger.exception("Live poll failed")
             _record_poll("live", error=str(exc))
@@ -145,7 +172,7 @@ def init_scheduler(app):
         func=_run_live_poll,
         args=[app],
         trigger="interval",
-        minutes=app.config["LIVE_POLL_INTERVAL_MINUTES"],
+        seconds=app.config["LIVE_POLL_INTERVAL_SECONDS"],
         id="live_poll",
         replace_existing=True,
         coalesce=True,
@@ -166,9 +193,9 @@ def init_scheduler(app):
     scheduler.start()
     _scheduler = scheduler
     logger.info(
-        "Scheduler started: live poll every %d min (active only during match windows), "
+        "Scheduler started: live poll every %d sec (active only during match windows), "
         "daily sync at %02d:%02d UTC",
-        app.config["LIVE_POLL_INTERVAL_MINUTES"],
+        app.config["LIVE_POLL_INTERVAL_SECONDS"],
         app.config["DAILY_SYNC_HOUR_UTC"],
         app.config["DAILY_SYNC_MINUTE_UTC"],
     )

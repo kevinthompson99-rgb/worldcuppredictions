@@ -140,14 +140,17 @@ neither of which exists in this repo yet) rather than running at app-boot time.
 Implemented with APScheduler's `BackgroundScheduler`, started inside the Flask process
 by `create_app` (see `maybe_start_scheduler`). Two jobs:
 
-- **`live_poll`** — fixed 3-minute interval, every tick. It computes "today's live
-  window" (`get_live_window`): `(earliest kickoff today − 15 min)` to
-  `(latest kickoff today + 105 min assumed match length + 30 min)`. If "now" isn't in
-  that window, the tick is a no-op (and isn't logged — only real polls/syncs hit
-  `PollLog`, so the log stays meaningful rather than filling with 480 "skipped" rows/day).
-  If it is, it calls `sync_fixtures_and_results(date_from=today, date_to=today)` —
-  scoped to just today's matches, since that's all that can change mid-window — updates
-  scores, rescores affected predictions, and records a `PollLog` row.
+- **`live_poll`** — fixed 30-second interval, every tick. It computes the current live
+  window (`get_live_window`): `(earliest relevant kickoff − 15 min)` to
+  `(latest relevant kickoff + 105 min assumed match length + 30 min)`. "Relevant"
+  fixtures are normally just today's, but `_relevant_dates` also pulls in the adjacent
+  day when "now" is within that 135-minute end buffer of UTC midnight, so a late
+  kick-off's window (e.g. 23:00 UTC → ends 01:15 UTC the next day) keeps being detected
+  across the day boundary. If "now" isn't in that window, the tick is a no-op (and isn't
+  logged — only real polls/syncs hit `PollLog`, so the log stays meaningful rather than
+  filling with ~2,880 "skipped" rows/day). If it is, it calls `sync_fixtures_and_results`
+  scoped to the same relevant date(s) — updates scores, rescores affected predictions,
+  and records a `PollLog` row.
 - **`daily_sync`** — cron trigger at 06:00 UTC (configurable via `DAILY_SYNC_HOUR_UTC`/
   `DAILY_SYNC_MINUTE_UTC`), runs the full unscoped sync to catch fixture changes and
   newly confirmed knockout matchups, also logged to `PollLog`.
