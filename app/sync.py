@@ -81,6 +81,8 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
         fixture.group_name = match.get("group")
         fixture.kickoff_at = _parse_kickoff(match["utcDate"])
         fixture.status = match.get("status", fixture.status)
+        fixture.current_minute = match.get("minute")
+        fixture.current_injury_time = match.get("injuryTime")
         fixture.is_knockout = fixture.stage in _KNOCKOUT_STAGES
         fixture.last_synced_at = datetime.utcnow()
 
@@ -110,9 +112,13 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
 
     db.session.flush()
 
+    # Rescore against the current score on every tick a fixture has one - whether the
+    # match is finished or still live, so points (and round totals) update in real time
+    # as the score changes during play, and finished fixtures get their final score.
     for fixture in touched_fixtures:
-        if fixture.is_finished and score_fixture(fixture) > 0:
-            scored_fixtures += 1
+        if fixture.home_score_90 is not None and fixture.away_score_90 is not None:
+            if score_fixture(fixture) > 0:
+                scored_fixtures += 1
 
     db.session.commit()
 

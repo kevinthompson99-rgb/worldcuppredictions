@@ -41,16 +41,16 @@ def _cell(user, prediction, fixture, locked, is_me):
                  included - the dedicated My Predictions screen is where a user
                  reviews/edits their own picks before the deadline)
       no_pick  - round has locked and this user never made a prediction
-      pending  - round has locked, prediction is visible, but the match hasn't finished
-      wrong    - finished, prediction scored 0 (wrong result)
-      correct  - finished, prediction scored the correct-result points (not exact)
-      exact    - finished, prediction matched the score exactly
+      pending  - round has locked, prediction is visible, but the fixture has no score yet
+      wrong    - scored 0 against the current/final score (wrong result)
+      correct  - scored the correct-result points against the current/final score (not exact)
+      exact    - matches the current/final score exactly
     """
     if not locked:
         status = "hidden"
     elif prediction is None:
         status = "no_pick"
-    elif not fixture.is_finished:
+    elif prediction.points is None:
         status = "pending"
     elif prediction.points == POINTS_EXACT_SCORE:
         status = "exact"
@@ -253,7 +253,7 @@ def scores_live():
     """
     round_ = get_active_round()
     if round_ is None or not round_.is_locked:
-        return jsonify(fixtures=[], is_live_window=False)
+        return jsonify(fixtures=[], is_live_window=False, totals={})
 
     fixtures = round_.fixtures.all()
     has_live = any(f.is_live for f in fixtures)
@@ -273,9 +273,14 @@ def scores_live():
                 "away_team": fixture.away_short_name or fixture.away_team,
                 "home_flag": flag_for(fixture.home_team),
                 "away_flag": flag_for(fixture.away_team),
+                "minute": fixture.current_minute,
+                "injury_time": fixture.current_injury_time,
             }
             for fixture in fixtures
         ],
+        # Live-scored points can move during a match - sent so the players grid's
+        # per-user totals stay current on every refresh, not just at page load.
+        totals={str(user.id): points for user, points in tournament_standings()},
     )
 
 
@@ -303,7 +308,8 @@ def round_live_scores(round_id):
                 "is_finished": fixture.is_finished,
                 "home_score": fixture.home_score_90,
                 "away_score": fixture.away_score_90,
-                "minute": fixture.elapsed_minutes,
+                "minute": fixture.current_minute,
+                "injury_time": fixture.current_injury_time,
                 "is_knockout": fixture.is_knockout,
                 "winner_team": (
                     fixture.home_team

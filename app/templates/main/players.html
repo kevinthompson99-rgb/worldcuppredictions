@@ -64,7 +64,7 @@
         <div class="pgrid-top" id="pgrid-top">
           <div class="pgrid-top-inner" id="pgrid-top-inner">
             {% for user in users %}
-            <div class="pgrid-user-cell">
+            <div class="pgrid-user-cell" data-user-id="{{ user.id }}">
               <span class="user-name">{{ user.display_name }}</span>
               <span class="user-points">{{ totals.get(user.id, 0) }}</span>
             </div>
@@ -79,7 +79,7 @@
               <div class="fixture-teams js-fixture-teams">
                 {% if row.fixture.is_finished %}
                   {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
-                {% elif row.fixture.is_live_by_time %}
+                {% elif row.fixture.is_live %}
                   {% set h = row.fixture.home_score_90 if row.fixture.home_score_90 is not none else 0 %}
                   {% set a = row.fixture.away_score_90 if row.fixture.away_score_90 is not none else 0 %}
                   {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
@@ -88,12 +88,12 @@
                 {% endif %}
               </div>
               <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
-                {% if row.fixture.is_finished or (row.fixture.kickoff_has_passed and not row.fixture.is_live_by_time) %}
+                {% if row.fixture.is_finished %}
                   <span class="fixture-ft">FT</span>
                 {% elif row.fixture.status == 'PAUSED' %}
                   <span class="live-badge live-badge-ht">HT</span>
-                {% elif row.fixture.is_live_by_time %}
-                  <span class="live-badge live-badge-live">LIVE</span>
+                {% elif row.fixture.is_live_minute %}
+                  <span class="live-badge live-badge-live">{{ row.fixture.minute_display }}</span>
                 {% else %}
                   {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
                 {% endif %}
@@ -139,33 +139,43 @@
 </div>
 
 <script>
-// Assumed match duration (kick-off to kick-off + this many ms) - shared by the
-// countdown and the per-fixture LIVE/FT display so both stay in sync purely from
-// stored kick-off times, with no dependency on the API status field.
-var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
-
-(function () {
+// "Match in progress" is driven by the API status (IN_PLAY/PAUSED/SUSPENDED) - see
+// has_live_fixtures (server-rendered) and is_live_window (from /scores/live on refresh).
+// The "Next Match" countdown below it is still purely kick-off-time based.
+var matchCountdown = (function () {
   var cdEl = document.getElementById('js-countdown');
-  if (cdEl) {
-    var kickoffs = {{ fixture_kickoffs | tojson }}.map(function (s) { return new Date(s).getTime(); });
-    function tick() {
-      var now = Date.now();
-      var anyLive = kickoffs.some(function (k) { return now >= k && now < k + LIVE_WINDOW_MS; });
-      if (anyLive) { cdEl.textContent = 'Match in progress'; return; }
-      var future = kickoffs.filter(function (k) { return k > now; });
-      if (!future.length) { cdEl.textContent = ''; return; }
-      var diff = Math.min.apply(null, future) - now;
-      var d = Math.floor(diff / 86400000);
-      var h = Math.floor((diff % 86400000) / 3600000);
-      var m = Math.floor((diff % 3600000) / 60000);
-      cdEl.textContent = 'Next Match: ' +
-        (d > 0 ? d + 'd ' : '') +
-        String(h).padStart(2, '0') + 'h ' +
-        String(m).padStart(2, '0') + 'm';
-    }
-    tick();
-    setInterval(tick, 60000);
+  var kickoffs = {{ fixture_kickoffs | tojson }}.map(function (s) { return new Date(s).getTime(); });
+  var anyLive = {{ has_live_fixtures | tojson }};
+
+  function render() {
+    if (!cdEl) { return; }
+    if (anyLive) { cdEl.textContent = 'Match in progress'; return; }
+    var now = Date.now();
+    var future = kickoffs.filter(function (k) { return k > now; });
+    if (!future.length) { cdEl.textContent = ''; return; }
+    var diff = Math.min.apply(null, future) - now;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    cdEl.textContent = 'Next Match: ' +
+      (d > 0 ? d + 'd ' : '') +
+      String(h).padStart(2, '0') + 'h ' +
+      String(m).padStart(2, '0') + 'm';
   }
+
+  if (cdEl) {
+    render();
+    setInterval(render, 60000);
+  }
+
+  return {
+    setLive: function (isLive) {
+      if (isLive !== anyLive) {
+        anyLive = isLive;
+        render();
+      }
+    }
+  };
 })();
 
 (function () {
@@ -180,6 +190,12 @@ var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
     return d.innerHTML;
   }
 
+  function minuteText(fixture) {
+    if (fixture.minute === null || fixture.minute === undefined) { return ''; }
+    if (fixture.injury_time) { return fixture.minute + '+' + fixture.injury_time + "'"; }
+    return fixture.minute + "'";
+  }
+
   function updateFixtureDisplay(fixture) {
     var th = document.querySelector('.fixture-cell[data-fixture-id="' + fixture.id + '"]');
     if (!th) { return; }
@@ -187,17 +203,13 @@ var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
     var metaEl = th.querySelector('.js-fixture-meta');
     if (!teamsEl || !metaEl) { return; }
 
-    var now = Date.now();
-    var kickoff = new Date(fixture.kickoff_at).getTime();
-    var isLiveByTime = now >= kickoff && now < kickoff + LIVE_WINDOW_MS;
-
-    if (fixture.is_finished) {
+    if (fixture.status === 'FINISHED' || fixture.status === 'AWARDED') {
       teamsEl.innerHTML =
         escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-result">' + fixture.home_score + ' &ndash; ' + fixture.away_score + '</span> ' +
         escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
       metaEl.innerHTML = '<span class="fixture-ft">FT</span>';
-    } else if (isLiveByTime) {
+    } else if (fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED' || fixture.status === 'SUSPENDED') {
       var hs = fixture.home_score !== null ? fixture.home_score : 0;
       var as_ = fixture.away_score !== null ? fixture.away_score : 0;
       teamsEl.innerHTML =
@@ -207,11 +219,21 @@ var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
       if (fixture.status === 'PAUSED') {
         metaEl.innerHTML = '<span class="live-badge live-badge-ht">HT</span>';
       } else {
-        metaEl.innerHTML = '<span class="live-badge live-badge-live">LIVE</span>';
+        metaEl.innerHTML = '<span class="live-badge live-badge-live">' + escapeHtml(minuteText(fixture)) + '</span>';
       }
-    } else if (now >= kickoff) {
-      metaEl.innerHTML = '<span class="fixture-ft">FT</span>';
     }
+    // Pre-kick-off statuses (SCHEDULED/TIMED) keep the server-rendered "v" and kick-off time.
+  }
+
+  function updateTotals(totals) {
+    if (!totals) { return; }
+    document.querySelectorAll('.pgrid-user-cell[data-user-id]').forEach(function (cell) {
+      var uid = cell.dataset.userId;
+      var pointsEl = cell.querySelector('.user-points');
+      if (pointsEl && Object.prototype.hasOwnProperty.call(totals, uid)) {
+        pointsEl.textContent = totals[uid];
+      }
+    });
   }
 
   function updateCellColors(fixture) {
@@ -300,6 +322,8 @@ var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
               updateFixtureDisplay(f);
               updateCellColors(f);
             });
+            updateTotals(data.totals);
+            matchCountdown.setLive(!!data.is_live_window);
           } else if (err) {
             console.log('[refresh] fetchScores failed:', err);
           }
@@ -337,9 +361,8 @@ var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
     });
   }
 
-  // Locked-only: poll and refresh the display in place. updateFixtureDisplay is
-  // purely time-based for LIVE/FT, so this also picks up kick-off/window
-  // transitions even when the API status hasn't changed.
+  // Locked-only: poll and refresh the display, points totals and "Match in progress"
+  // indicator in place, all driven by the API status/score on each tick.
   if (isLocked) {
     setInterval(function () {
       fetchScores(function (err, data) {
@@ -348,6 +371,8 @@ var LIVE_WINDOW_MS = {{ config.LIVE_POLL_ASSUMED_MATCH_MINUTES }} * 60000;
           updateFixtureDisplay(f);
           updateCellColors(f);
         });
+        updateTotals(data.totals);
+        matchCountdown.setLive(!!data.is_live_window);
       });
     }, 30000);
   }

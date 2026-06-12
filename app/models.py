@@ -163,6 +163,11 @@ class Fixture(db.Model):
     home_score_90 = db.Column(db.Integer, nullable=True)
     away_score_90 = db.Column(db.Integer, nullable=True)
 
+    # Live match clock from the API ("minute"/"injuryTime"), only meaningful while
+    # status is one of _LIVE_MINUTE_STATUSES - see minute_display.
+    current_minute = db.Column(db.Integer, nullable=True)
+    current_injury_time = db.Column(db.Integer, nullable=True)
+
     # Final outcome of the match (after ET/penalties if applicable). Always HOME or AWAY
     # for knockout fixtures - "correct result" there means picking the side that advances,
     # regardless of the 90-minute scoreline. DRAW is only possible in group-stage matches.
@@ -172,52 +177,40 @@ class Fixture(db.Model):
 
     predictions = db.relationship("Prediction", back_populates="fixture", lazy="dynamic")
 
-    # football-data.org statuses while a match is being played - used to drive the
-    # live-score display on the results page (see main.round_results / round_live_scores).
-    _LIVE_STATUSES = ("IN_PLAY", "PAUSED")
-
-    # Assumed match duration (90 minutes + stoppage time/breaks) - mirrors
-    # config.LIVE_POLL_ASSUMED_MATCH_MINUTES. Used to derive the LIVE/FT display and
-    # "Match in progress" countdown purely from kick-off time, so they stay in sync
-    # without depending on the API status field (which can lag or be wrong).
-    LIVE_WINDOW_MINUTES = 105
+    # football-data.org statuses, used to drive the live-score display (see
+    # main.players / main.scores_live and templates/main/players.html).
+    _FINISHED_STATUSES = ("FINISHED", "AWARDED")
+    _LIVE_MINUTE_STATUSES = ("IN_PLAY", "SUSPENDED")
+    _IN_PROGRESS_STATUSES = ("IN_PLAY", "PAUSED", "SUSPENDED")
 
     @property
     def is_finished(self):
-        return self.home_score_90 is not None and self.away_score_90 is not None
+        """FINISHED or AWARDED - the result is final and "FT" is shown for the rest of the round."""
+        return self.status in self._FINISHED_STATUSES
 
     @property
     def is_live(self):
-        return self.status in self._LIVE_STATUSES
+        """IN_PLAY, PAUSED or SUSPENDED - a match currently underway (incl. half-time/stoppages)."""
+        return self.status in self._IN_PROGRESS_STATUSES
 
     @property
-    def kickoff_has_passed(self):
-        return datetime.utcnow() >= self.kickoff_at
+    def is_live_minute(self):
+        """IN_PLAY or SUSPENDED - statuses where the API's match-minute clock applies."""
+        return self.status in self._LIVE_MINUTE_STATUSES
 
     @property
-    def is_live_by_time(self):
-        """Whether we're within the assumed live window: kick-off to kick-off + 105 min."""
-        now = datetime.utcnow()
-        return self.kickoff_at <= now < self.kickoff_at + timedelta(minutes=self.LIVE_WINDOW_MINUTES)
-
-    @property
-    def elapsed_minutes(self):
-        """Rough match minute, derived from kickoff time.
-
-        The free football-data.org tier doesn't reliably expose a live "minute" field,
-        so we approximate from elapsed wall-clock time since kickoff. Capped at 90 -
-        stoppage time/half-time breaks make a precise figure impossible without richer
-        live data, and an approximation beyond 90' would be misleading either way.
-        """
-        if not self.is_live:
+    def minute_display(self):
+        """Match clock as shown to users, e.g. "41'" or "45+2'" during injury time."""
+        if self.current_minute is None:
             return None
-        elapsed = int((datetime.utcnow() - self.kickoff_at).total_seconds() // 60)
-        return max(0, min(elapsed, 90))
+        if self.current_injury_time:
+            return f"{self.current_minute}+{self.current_injury_time}'"
+        return f"{self.current_minute}'"
 
     @property
     def result_outcome(self):
-        """HOME/AWAY/DRAW based on the 90-minute score - used for group-stage scoring."""
-        if not self.is_finished:
+        """HOME/AWAY/DRAW based on the current/90-minute score - used for scoring."""
+        if self.home_score_90 is None or self.away_score_90 is None:
             return None
         if self.home_score_90 > self.away_score_90:
             return OUTCOME_HOME
