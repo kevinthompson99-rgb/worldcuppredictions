@@ -322,12 +322,12 @@ def fixtures():
 
 @bp.route("/fixtures/<int:fixture_id>/edit", methods=["POST"])
 def edit_fixture(fixture_id):
-    """Manually correct the 90-minute score / winner / knockout flag.
+    """Manually correct the 90-minute score / winner.
 
     Needed because the football-data.org API doesn't cleanly separate the 90-minute
     score from the extra-time score for knockout matches (see app/sync.py). Predictions
     are scored against `home_score_90`/`away_score_90` only (see app/scoring.py), so
-    this is the figure that must be corrected - the winner/knockout fields don't affect scoring.
+    this is the figure that must be corrected - the winner field doesn't affect scoring.
     """
     form = CSRFForm()
     if not form.validate_on_submit():
@@ -338,7 +338,6 @@ def edit_fixture(fixture_id):
     home_raw = request.form.get("home_score_90", "").strip()
     away_raw = request.form.get("away_score_90", "").strip()
     winner = request.form.get("winner") or None
-    fixture.is_knockout = bool(request.form.get("is_knockout"))
 
     if home_raw.isdigit() and away_raw.isdigit():
         fixture.home_score_90 = int(home_raw)

@@ -37,11 +37,7 @@
           <option value="AWAY" {{ 'selected' if fixture.winner == 'AWAY' }}>{{ fixture.away_team | flag }} {{ fixture.away_short_name or fixture.away_team }}</option>
           <option value="DRAW" {{ 'selected' if fixture.winner == 'DRAW' }}>Draw</option>
         </select>
-        <div class="form-check">
-          <input type="checkbox" name="is_knockout" class="form-check-input" id="ko-{{ fixture.id }}" {{ 'checked' if fixture.is_knockout }}>
-          <label class="form-check-label" for="ko-{{ fixture.id }}">knockout</label>
-        </div>
-        <button type="submit" class="btn btn-sm btn-outline-primary">Save &amp; rescore</button>
+        <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
       </form>
     </li>
     {% else %}
