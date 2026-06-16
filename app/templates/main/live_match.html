@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block title %}Live: {{ fixture.home_short_name or fixture.home_team }} v {{ fixture.away_short_name or fixture.away_team }}{% endblock %}
+{% block body_class %}live-match-body{% endblock %}
+{% block content %}
+
+{# Shorthand for current score (null-safe) #}
+{% set h_score = fixture.home_score_90 if fixture.home_score_90 is not none else 0 %}
+{% set a_score = fixture.away_score_90 if fixture.away_score_90 is not none else 0 %}
+{% if fixture.status == 'PAUSED' %}
+  {% set minute_text = 'HT' %}
+{% elif fixture.is_finished %}
+  {% set minute_text = 'FT' %}
+{% elif fixture.minute_display %}
+  {% set minute_text = fixture.minute_display %}
+{% else %}
+  {% set minute_text = 'LIVE' %}
+{% endif %}
+
+<div class="live-match-page">
+
+  {# ── Top third: scoreboard ── #}
+  <div class="lm-scoreboard">
+
+    <div class="lm-nav">
+      <a href="{{ url_for('main.players') }}" class="leaderboard-back lm-home-btn">&larr; Home</a>
+      <div class="lm-nav-right">
+        <button id="lm-refresh-btn" class="players-action-tile" title="Refresh scores" aria-label="Refresh scores">
+          <span class="players-action-icon">&#8635;</span>
+        </button>
+        {% if live_ids | length > 1 %}
+        <div class="lm-dots" role="navigation" aria-label="Live matches">
+          {% for fid in live_ids %}
+          <a href="{{ url_for('main.live_match', fixture_id=fid) }}"
+             class="lm-dot{% if fid == fixture.id %} lm-dot-active{% endif %}"
+             aria-label="Match {{ loop.index }}{% if fid == fixture.id %} (current){% endif %}"></a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="lm-match-row">
+      <div class="lm-team lm-team-home">
+        <span class="lm-team-flag">{{ home_flag }}</span>
+        <span class="lm-team-name">{{ fixture.home_short_name or fixture.home_team }}</span>
+      </div>
+
+      <div class="lm-score-block">
+        <div class="lm-score">
+          <span id="lm-home-score">{{ h_score }}</span>
+          <span class="lm-score-dash">–</span>
+          <span id="lm-away-score">{{ a_score }}</span>
+        </div>
+        <div class="lm-minute" id="lm-minute">{{ minute_text }}</div>
+      </div>
+
+      <div class="lm-team lm-team-away">
+        <span class="lm-team-flag">{{ away_flag }}</span>
+        <span class="lm-team-name">{{ fixture.away_short_name or fixture.away_team }}</span>
+      </div>
+    </div>
+
+  </div>{# /lm-scoreboard #}
+
+  {# ── Bottom two thirds: predictions ── #}
+  <div class="lm-predictions">
+    {% if pred_entries %}
+    <div class="lm-pred-table">
+      {% for entry in pred_entries %}
+      <span class="lm-pred-name">{{ entry.user.display_name }}</span>
+      <span class="lm-pred-score lm-pred-{{ entry.status }}"
+            {% if entry.prediction %}data-ph="{{ entry.prediction.predicted_home }}" data-pa="{{ entry.prediction.predicted_away }}"{% endif %}>
+        {%- if entry.prediction -%}{{ entry.prediction.predicted_home }}&ndash;{{ entry.prediction.predicted_away }}{%- else -%}&ndash;{%- endif -%}
+      </span>
+      {% endfor %}
+      {# Pad to even count so the last row fills the grid cleanly #}
+      {% if pred_entries | length % 2 != 0 %}
+      <span class="lm-pred-filler"></span>
+      <span class="lm-pred-filler"></span>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="lm-no-preds">No predictions to show for this match.</p>
+    {% endif %}
+  </div>
+
+</div>{# /live-match-page #}
+
+<script>
+(function () {
+  var FIXTURE_ID = {{ fixture.id }};
+  var FT_DISPLAY_MS = 30 * 60 * 1000;
+
+  var isFinished = {{ fixture.is_finished | tojson }};
+  var ftDetectedAt = isFinished ? Date.now() : null;
+
+  var swipePrevUrl = {{ (url_for('main.live_match', fixture_id=prev_fixture_id) if prev_fixture_id else None) | tojson }};
+  var swipeNextUrl = {{ (url_for('main.live_match', fixture_id=next_fixture_id) if next_fixture_id else None) | tojson }};
+  var homeUrl = {{ url_for('main.players') | tojson }};
+
+  function lmMinuteText(f) {
+    if (f.status === 'PAUSED') return 'HT';
+    if (f.status === 'FINISHED' || f.status === 'AWARDED') return 'FT';
+    if (f.minute === null || f.minute === undefined) return 'LIVE';
+    if (f.injury_time) return f.minute + '+' + f.injury_time + "'";
+    return f.minute + "'";
+  }
+
+  function lmPredStatus(ph, pa, ah, aa) {
+    if (ah === null || ah === undefined || aa === null || aa === undefined) return 'pending';
+    if (ph === ah && pa === aa) return 'exact';
+    var pOut = ph > pa ? 'H' : pa > ph ? 'A' : 'D';
+    var aOut = ah > aa ? 'H' : aa > ah ? 'A' : 'D';
+    return pOut === aOut ? 'correct' : 'wrong';
+  }
+
+  function updateDisplay(f) {
+    var homeScoreEl = document.getElementById('lm-home-score');
+    var awayScoreEl = document.getElementById('lm-away-score');
+    var minuteEl    = document.getElementById('lm-minute');
+
+    if (homeScoreEl) homeScoreEl.textContent = f.home_score !== null ? f.home_score : 0;
+    if (awayScoreEl) awayScoreEl.textContent = f.away_score !== null ? f.away_score : 0;
+    if (minuteEl)    minuteEl.textContent = lmMinuteText(f);
+
+    if ((f.status === 'FINISHED' || f.status === 'AWARDED') && !ftDetectedAt) {
+      ftDetectedAt = Date.now();
+      isFinished = true;
+      setTimeout(function () { window.location.href = homeUrl; }, FT_DISPLAY_MS);
+    }
+
+    var ah = f.home_score, aa = f.away_score;
+    document.querySelectorAll('.lm-pred-score[data-ph]').forEach(function (el) {
+      var ph = parseInt(el.dataset.ph, 10);
+      var pa = parseInt(el.dataset.pa, 10);
+      el.className = 'lm-pred-score lm-pred-' + lmPredStatus(ph, pa, ah, aa);
+    });
+  }
+
+  function lmRefresh() {
+    fetch('/scores/live', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        var f = (data.fixtures || []).find(function (f) { return f.id === FIXTURE_ID; });
+        if (f) updateDisplay(f);
+      })
+      .catch(function () {});
+  }
+
+  setInterval(lmRefresh, 30000);
+
+  var refreshBtn = document.getElementById('lm-refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function () { lmRefresh(); });
+  }
+
+  // If the match was already finished at page load, start the 30-min countdown now.
+  if (isFinished && ftDetectedAt) {
+    setTimeout(function () { window.location.href = homeUrl; }, FT_DISPLAY_MS);
+  }
+
+  // Horizontal swipe navigates between live matches.
+  if (swipePrevUrl || swipeNextUrl) {
+    var touchStartX = 0, touchStartY = 0;
+    document.addEventListener('touchstart', function (e) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      var dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+        if (dx < 0 && swipeNextUrl) { window.location.href = swipeNextUrl; }
+        if (dx > 0 && swipePrevUrl) { window.location.href = swipePrevUrl; }
+      }
+    }, { passive: true });
+  }
+})();
+</script>
+
+<style>
+  html:has(body.live-match-body),
+  body.live-match-body {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body.live-match-body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    background: #121417;
+    display: flex;
+    flex-direction: column;
+  }
+  body.live-match-body .navbar {
+    background-color: #121417 !important;
+    flex: 0 0 auto;
+    margin-bottom: 0 !important;
+  }
+  body.live-match-body footer {
+    display: none;
+  }
+  body.live-match-body > div.container {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  .live-match-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    color: #e9ecef;
+  }
+
+  /* ── Scoreboard (top 1/3) ── */
+  .lm-scoreboard {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: #0d1117;
+    border-bottom: 1px solid #2a2f36;
+    padding: 0.5rem 0.75rem 0.6rem;
+    box-sizing: border-box;
+  }
+
+  .lm-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+  }
+  .lm-home-btn {
+    margin-bottom: 0 !important;
+  }
+  .lm-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .lm-dots {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .lm-dot {
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #3a4048;
+    transition: background 0.2s;
+  }
+  .lm-dot-active {
+    background: #ffd166;
+  }
+
+  /* Three-column layout: home team | score | away team */
+  .lm-match-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 0.25rem;
+    padding: 0.25rem 0;
+  }
+  .lm-team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 0.2rem;
+  }
+  .lm-team-flag {
+    font-size: 2rem;
+    line-height: 1;
+  }
+  .lm-team-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #c8d0d9;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .lm-score-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 0 0.5rem;
+  }
+  .lm-score {
+    font-size: clamp(2rem, 8vw, 3.2rem);
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 0.1em;
+  }
+  .lm-score-dash {
+    font-weight: 300;
+    color: #555;
+    font-size: 0.7em;
+  }
+  .lm-minute {
+    margin-top: 0.3rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffd166;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Predictions (bottom 2/3) ── */
+  .lm-predictions {
+    flex: 2 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #121417;
+  }
+  .lm-no-preds {
+    color: #6c757d;
+    font-size: 0.85rem;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  /* 4-column grid: name | score | name | score */
+  .lm-pred-table {
+    display: grid;
+    grid-template-columns: 1fr min-content 1fr min-content;
+    border-top: 1px solid #1e2227;
+  }
+  .lm-pred-name {
+    padding: 0.42rem 0.5rem;
+    font-size: 0.78rem;
+    color: #c8d0d9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid #1e2227;
+    display: flex;
+    align-items: center;
+  }
+  .lm-pred-score {
+    padding: 0.42rem 0.6rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+    border-bottom: 1px solid #1e2227;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Divider between left and right player pairs */
+  .lm-pred-table > *:nth-child(4n+3),
+  .lm-pred-table > *:nth-child(4n+4) {
+    /* Right pair: subtle left rule on the name cell */
+  }
+  .lm-pred-table > *:nth-child(4n+3) {
+    border-left: 1px solid #2a2f36;
+  }
+  .lm-pred-filler {
+    border-bottom: 1px solid #1e2227;
+  }
+
+  /* Prediction status colours */
+  .lm-pred-exact   { color: #ffd166; font-weight: 800; }
+  .lm-pred-correct { color: #74c69d; font-weight: 700; }
+  .lm-pred-wrong   { color: #6c757d; font-weight: 400; }
+  .lm-pred-pending { color: #4a5260; font-weight: 400; }
+  .lm-pred-no_pick { color: #3a4048; font-weight: 400; }
+</style>
+
+{% endblock %}

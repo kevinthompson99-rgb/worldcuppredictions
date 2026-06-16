@@ -14,9 +14,9 @@ from app.finance import (
 from app.forms import CSRFForm
 from app.leaderboards import tournament_standings
 from app.teams import flag_for
-from app.models import ROUND_STATUS_DRAFT, Prediction, Round, RoundEntry, User
+from app.models import ROUND_STATUS_DRAFT, Fixture, Prediction, Round, RoundEntry, User
 from app.round_helpers import get_active_round, get_round_for_leaderboard
-from app.scoring import POINTS_EXACT_SCORE
+from app.scoring import calculate_points, POINTS_CORRECT_RESULT, POINTS_EXACT_SCORE
 
 bp = Blueprint("main", __name__)
 
@@ -144,6 +144,7 @@ def players():
     fixture_kickoffs = [f.kickoff_at.strftime("%Y-%m-%dT%H:%M:%SZ") for f in fixtures]
 
     has_live_fixtures = any(f.is_live for f in fixtures)
+    live_fixture_ids = [f.id for f in fixtures if f.is_live]
 
     return render_template(
         "main/players.html",
@@ -162,6 +163,7 @@ def players():
         pot=round_pot(len(users), round_.stake_amount) if round_ is not None else None,
         fixture_kickoffs=fixture_kickoffs,
         has_live_fixtures=has_live_fixtures,
+        live_fixture_ids=live_fixture_ids,
     )
 
 
@@ -240,6 +242,73 @@ def tournament_leaderboard_view():
 def round_results(round_id):
     # Folded into the players home screen - keep the URL alive for old bookmarks/links.
     return redirect(url_for("main.players"))
+
+
+def _live_pred_status(prediction, fixture):
+    """Status string for a prediction against a live fixture's current score."""
+    if prediction is None:
+        return "no_pick"
+    points = calculate_points(prediction, fixture)
+    if points is None:
+        return "pending"
+    if points == POINTS_EXACT_SCORE:
+        return "exact"
+    if points == POINTS_CORRECT_RESULT:
+        return "correct"
+    return "wrong"
+
+
+@bp.route("/live/<int:fixture_id>")
+@login_required
+def live_match(fixture_id):
+    """Full-screen live match view: scoreboard + all players' predictions for this fixture.
+
+    Accessible for any fixture in the active locked round that is currently in-play
+    or has finished.  The client-side JS handles the 30-minute post-FT countdown
+    before auto-navigating back to the home screen.
+    """
+    fixture = Fixture.query.get_or_404(fixture_id)
+    round_ = get_active_round()
+
+    if round_ is None or fixture.round_id != round_.id or not round_.is_locked:
+        return redirect(url_for("main.players"))
+    if not (fixture.is_live or fixture.is_finished):
+        return redirect(url_for("main.players"))
+
+    all_fixtures = round_.fixtures.order_by(Fixture.kickoff_at).all()
+
+    # Only currently-live fixtures appear in the swipe carousel / dots.
+    live_fixtures = [f for f in all_fixtures if f.is_live]
+    live_ids = [f.id for f in live_fixtures]
+    current_idx = live_ids.index(fixture_id) if fixture_id in live_ids else -1
+    prev_fixture_id = live_ids[current_idx - 1] if current_idx > 0 else None
+    next_fixture_id = live_ids[current_idx + 1] if 0 <= current_idx < len(live_ids) - 1 else None
+
+    entrant_ids = {entry.user_id for entry in round_.entries.filter_by(opted_in=True)}
+    users = User.query.filter(User.id.in_(entrant_ids)).order_by(User.display_name.asc()).all()
+
+    preds = {p.user_id: p for p in Prediction.query.filter_by(fixture_id=fixture_id)}
+    pred_entries = [
+        {
+            "user": user,
+            "prediction": preds.get(user.id),
+            "status": _live_pred_status(preds.get(user.id), fixture),
+        }
+        for user in users
+    ]
+
+    return render_template(
+        "main/live_match.html",
+        fixture=fixture,
+        round=round_,
+        pred_entries=pred_entries,
+        live_ids=live_ids,
+        current_idx=current_idx,
+        prev_fixture_id=prev_fixture_id,
+        next_fixture_id=next_fixture_id,
+        home_flag=flag_for(fixture.home_team),
+        away_flag=flag_for(fixture.away_team),
+    )
 
 
 @bp.route("/scores/live")

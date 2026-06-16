@@ -11,7 +11,10 @@ TIMEOUT_SECONDS = 15
 
 
 def _headers():
-    return {"X-Auth-Token": current_app.config["FOOTBALL_DATA_API_KEY"]}
+    return {
+        "X-Auth-Token": current_app.config["FOOTBALL_DATA_API_KEY"],
+        "X-Api-Version": "v4.1",
+    }
 
 
 def get_world_cup_matches(date_from=None, date_to=None):

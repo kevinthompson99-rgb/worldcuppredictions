@@ -75,7 +75,7 @@
         <div class="pgrid-left" id="pgrid-left">
           <div class="pgrid-left-inner" id="pgrid-left-inner">
             {% for row in grid %}
-            <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}">
+            <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}"{% if locked %} data-live-url="{{ url_for('main.live_match', fixture_id=row.fixture.id) }}"{% endif %}>
               <div class="fixture-teams js-fixture-teams">
                 {% if row.fixture.is_finished %}
                   {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
@@ -139,6 +139,31 @@
 </div>
 
 <script>
+// Tap a live fixture cell to open its live match screen.
+(function () {
+  var liveIds = new Set({{ live_fixture_ids | tojson }});
+  var dragged = false;
+
+  var pgridLeft = document.getElementById('pgrid-left');
+  if (pgridLeft) {
+    pgridLeft.addEventListener('touchstart', function () { dragged = false; }, { passive: true });
+    pgridLeft.addEventListener('touchmove',  function () { dragged = true;  }, { passive: true });
+    pgridLeft.addEventListener('click', function (e) {
+      if (dragged) return;
+      var cell = e.target.closest('.pgrid-fixture-cell[data-live-url]');
+      if (!cell) return;
+      var fid = parseInt(cell.dataset.fixtureId, 10);
+      if (liveIds.has(fid)) window.location.href = cell.dataset.liveUrl;
+    });
+  }
+
+  // Keep liveIds in sync when the 30-second poller refreshes scores.
+  window._updateLiveIds = function (fixtures) {
+    liveIds.clear();
+    (fixtures || []).forEach(function (f) { if (f.is_live) liveIds.add(f.id); });
+  };
+})();
+
 // "Match in progress" is driven by the API status (IN_PLAY/PAUSED/SUSPENDED) - see
 // has_live_fixtures (server-rendered) and is_live_window (from /scores/live on refresh).
 // The "Next Match" countdown below it is still purely kick-off-time based.
@@ -329,6 +354,7 @@ var matchCountdown = (function () {
             });
             updateTotals(data.totals);
             matchCountdown.setLive(!!data.is_live_window);
+            if (window._updateLiveIds) window._updateLiveIds(data.fixtures);
           } else if (err) {
             console.log('[refresh] fetchScores failed:', err);
           }
@@ -378,6 +404,7 @@ var matchCountdown = (function () {
         });
         updateTotals(data.totals);
         matchCountdown.setLive(!!data.is_live_window);
+        if (window._updateLiveIds) window._updateLiveIds(data.fixtures);
       });
     }, 30000);
   }
@@ -810,6 +837,12 @@ var matchCountdown = (function () {
     border-right: 1px solid #262b32;
     background: #1f242b;
     text-align: left;
+  }
+  .pgrid-fixture-cell[data-live-url] {
+    cursor: pointer;
+  }
+  .pgrid-fixture-cell[data-live-url]:active {
+    background: #262c34;
   }
 
   /* Body: clipping container — no native scrolling, content moved via JS transforms */

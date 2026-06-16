@@ -24,12 +24,14 @@
        Scoped to the three dark-theme body classes so admin/auth pages are unaffected. */
     body.players-body,
     body.leaderboard-body,
-    body.predictions-body { background-color: #121417; }
+    body.predictions-body,
+    body.live-match-body { background-color: #121417; }
 
-    /* Dark-themed success toast on the three dark pages */
+    /* Dark-themed success toast on the dark pages */
     body.players-body .alert-success,
     body.leaderboard-body .alert-success,
-    body.predictions-body .alert-success {
+    body.predictions-body .alert-success,
+    body.live-match-body .alert-success {
       background: #1a2a1e;
       border: 1px solid #2d4a35;
       color: #74c69d;
