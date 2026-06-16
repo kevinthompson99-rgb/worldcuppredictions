@@ -86,6 +86,14 @@
 
 </div>{# /live-match-page #}
 
+<div id="lm-refresh-overlay" class="lm-overlay" role="status" aria-label="Refreshing scores" aria-hidden="true">
+  <div class="lm-spinner">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+  </div>
+</div>
+
 <script>
 (function () {
   var FIXTURE_ID = {{ fixture.id }};
@@ -97,6 +105,17 @@
   var swipePrevUrl = {{ (url_for('main.live_match', fixture_id=prev_fixture_id) if prev_fixture_id else None) | tojson }};
   var swipeNextUrl = {{ (url_for('main.live_match', fixture_id=next_fixture_id) if next_fixture_id else None) | tojson }};
   var homeUrl = {{ url_for('main.players') | tojson }};
+
+  var overlay     = document.getElementById('lm-refresh-overlay');
+  var refreshBtn  = document.getElementById('lm-refresh-btn');
+  var isRefreshing = false;
+
+  function showOverlay() {
+    if (overlay) { overlay.classList.add('is-visible'); overlay.setAttribute('aria-hidden', 'false'); }
+  }
+  function hideOverlay() {
+    if (overlay) { overlay.classList.remove('is-visible'); overlay.setAttribute('aria-hidden', 'true'); }
+  }
 
   function lmMinuteText(f) {
     if (f.status === 'PAUSED') return 'HT';
@@ -137,22 +156,51 @@
     });
   }
 
-  function lmRefresh() {
+  function triggerRefresh(withOverlay) {
+    if (isRefreshing) return;
+    isRefreshing = true;
+    var t0 = Date.now();
+    var finished = false;
+
+    function finish() {
+      if (finished) return;
+      finished = true;
+      clearTimeout(fallbackTimer);
+      isRefreshing = false;
+      if (refreshBtn) refreshBtn.disabled = false;
+      if (withOverlay) hideOverlay();
+    }
+
+    if (withOverlay) showOverlay();
+    if (refreshBtn) refreshBtn.disabled = true;
+
+    // Belt-and-braces: force-dismiss the spinner if the fetch callback never fires.
+    var fallbackTimer = setTimeout(function () { finish(); }, 6000);
+
     fetch('/scores/live', { headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
-        if (!data) return;
-        var f = (data.fixtures || []).find(function (f) { return f.id === FIXTURE_ID; });
-        if (f) updateDisplay(f);
+        try {
+          if (data) {
+            var f = (data.fixtures || []).find(function (f) { return f.id === FIXTURE_ID; });
+            if (f) updateDisplay(f);
+          }
+        } finally {
+          // Spinner shows for at least 2 seconds on manual refresh so the user
+          // can see it reacted; silent auto-refresh dismisses immediately.
+          var delay = withOverlay ? Math.max(0, 2000 - (Date.now() - t0)) : 0;
+          setTimeout(finish, delay);
+        }
       })
-      .catch(function () {});
+      .catch(function () { setTimeout(finish, 0); });
   }
 
-  setInterval(lmRefresh, 30000);
+  // Silent auto-refresh every 30 seconds.
+  setInterval(function () { triggerRefresh(false); }, 30000);
 
-  var refreshBtn = document.getElementById('lm-refresh-btn');
+  // Manual refresh shows spinner overlay.
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', function () { lmRefresh(); });
+    refreshBtn.addEventListener('click', function () { triggerRefresh(true); });
   }
 
   // If the match was already finished at page load, start the 30-min countdown now.
@@ -412,6 +460,58 @@
   .lm-pred-wrong   { color: #6c757d; font-weight: 400; }
   .lm-pred-pending { color: #4a5260; font-weight: 400; }
   .lm-pred-no_pick { color: #3a4048; font-weight: 400; }
+
+  /* ── Refresh overlay + Apple-style spinner (matches home screen) ── */
+  .lm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .lm-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .lm-spinner {
+    position: relative;
+    width: 40px;
+    height: 40px;
+  }
+  .lm-spinner span {
+    position: absolute;
+    width: 3px;
+    height: 10px;
+    background: #fff;
+    border-radius: 2px;
+    left: 50%;
+    top: 5px;
+    margin-left: -1.5px;
+    transform-origin: 50% 15px;
+    opacity: 0.15;
+    animation: lm-fade 1.2s linear infinite;
+  }
+  .lm-spinner span:nth-child(1)  { transform: rotate(0deg);   animation-delay: -1.1s; }
+  .lm-spinner span:nth-child(2)  { transform: rotate(30deg);  animation-delay: -1.0s; }
+  .lm-spinner span:nth-child(3)  { transform: rotate(60deg);  animation-delay: -0.9s; }
+  .lm-spinner span:nth-child(4)  { transform: rotate(90deg);  animation-delay: -0.8s; }
+  .lm-spinner span:nth-child(5)  { transform: rotate(120deg); animation-delay: -0.7s; }
+  .lm-spinner span:nth-child(6)  { transform: rotate(150deg); animation-delay: -0.6s; }
+  .lm-spinner span:nth-child(7)  { transform: rotate(180deg); animation-delay: -0.5s; }
+  .lm-spinner span:nth-child(8)  { transform: rotate(210deg); animation-delay: -0.4s; }
+  .lm-spinner span:nth-child(9)  { transform: rotate(240deg); animation-delay: -0.3s; }
+  .lm-spinner span:nth-child(10) { transform: rotate(270deg); animation-delay: -0.2s; }
+  .lm-spinner span:nth-child(11) { transform: rotate(300deg); animation-delay: -0.1s; }
+  .lm-spinner span:nth-child(12) { transform: rotate(330deg); animation-delay:    0s; }
+  @keyframes lm-fade {
+    0%   { opacity: 1; }
+    100% { opacity: 0.15; }
+  }
 </style>
 
 {% endblock %}
