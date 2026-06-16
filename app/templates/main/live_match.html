@@ -24,8 +24,8 @@
     <div class="lm-nav">
       <a href="{{ url_for('main.players') }}" class="leaderboard-back lm-home-btn">&larr; Home</a>
       <div class="lm-nav-right">
-        <button id="lm-refresh-btn" class="players-action-tile" title="Refresh scores" aria-label="Refresh scores">
-          <span class="players-action-icon">&#8635;</span>
+        <button id="lm-refresh-btn" class="lm-action-tile" title="Refresh scores" aria-label="Refresh scores">
+          <span class="lm-action-icon">&#8635;</span>
         </button>
         {% if live_ids | length > 1 %}
         <div class="lm-dots" role="navigation" aria-label="Live matches">
@@ -240,6 +240,33 @@
   }
   .lm-home-btn {
     margin-bottom: 0 !important;
+    color: #ffd166 !important;
+    text-decoration: none;
+    font-size: 0.85rem;
+  }
+  .lm-home-btn:hover {
+    color: #ffe599 !important;
+  }
+  .lm-action-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    background: #000;
+    border: 1px solid #333;
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+    color: #ffd166;
+    transition: background-color 0.15s ease;
+  }
+  .lm-action-tile:hover {
+    background: #1a1500;
+  }
+  .lm-action-icon {
+    font-size: 1.05rem;
+    line-height: 1;
   }
   .lm-nav-right {
     display: flex;
