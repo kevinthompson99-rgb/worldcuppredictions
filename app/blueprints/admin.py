@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -163,7 +164,10 @@ def create_round():
 def round_detail(round_id):
     round_ = Round.query.get_or_404(round_id)
     unassigned = (
-        Fixture.query.filter(Fixture.round_id.is_(None)).order_by(Fixture.kickoff_at.asc()).all()
+        Fixture.query.filter(
+            Fixture.round_id.is_(None),
+            Fixture.kickoff_at > datetime.utcnow()
+        ).order_by(Fixture.kickoff_at.asc()).all()
     )
     return render_template(
         "admin/round_detail.html",
