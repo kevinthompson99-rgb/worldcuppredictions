@@ -34,6 +34,9 @@ def round_leaderboard(round_: Round):
             Prediction.user_id.label("user_id"),
             func.coalesce(func.sum(Prediction.points), 0).label("tournament_points"),
         )
+        .join(Fixture, Fixture.id == Prediction.fixture_id)
+        .join(Round, Round.id == Fixture.round_id)
+        .filter(Round.status == "COMPLETE")
         .group_by(Prediction.user_id)
         .subquery()
     )
@@ -52,11 +55,21 @@ def round_leaderboard(round_: Round):
 
 
 def tournament_standings():
-    """List of (user, points) cumulative across every scored prediction, highest first."""
+    """List of (user, points) cumulative across COMPLETE rounds, highest first."""
+    pts = (
+        db.session.query(
+            Prediction.user_id.label("user_id"),
+            func.coalesce(func.sum(Prediction.points), 0).label("points"),
+        )
+        .join(Fixture, Fixture.id == Prediction.fixture_id)
+        .join(Round, Round.id == Fixture.round_id)
+        .filter(Round.status == "COMPLETE")
+        .group_by(Prediction.user_id)
+        .subquery()
+    )
     rows = (
-        db.session.query(User, func.coalesce(func.sum(Prediction.points), 0).label("points"))
-        .outerjoin(Prediction, Prediction.user_id == User.id)
-        .group_by(User.id)
+        db.session.query(User, func.coalesce(pts.c.points, 0).label("points"))
+        .outerjoin(pts, pts.c.user_id == User.id)
         .order_by(db.desc("points"), User.display_name.asc())
         .all()
     )
