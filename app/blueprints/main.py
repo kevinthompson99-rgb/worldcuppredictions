@@ -12,7 +12,7 @@ from app.finance import (
     season_financial_table,
 )
 from app.forms import CSRFForm
-from app.leaderboards import tournament_standings
+from app.leaderboards import round_leaderboard
 from app.teams import flag_for
 from app.models import ROUND_STATUS_DRAFT, Fixture, Prediction, Round, RoundEntry, User
 from app.round_helpers import get_active_round, get_round_for_leaderboard
@@ -136,7 +136,7 @@ def players():
         for fixture in fixtures
     ]
 
-    standings = tournament_standings()
+    standings = round_leaderboard(round_) if round_ is not None else []
 
     # All kick-off times for the round, for the JS countdown - it works out which
     # match (if any) is currently in its live window and which is next purely from
@@ -155,7 +155,7 @@ def players():
         grid=grid,
         locked=locked,
         avatars={user.id: _avatar(user) for user in users},
-        totals={user.id: points for user, points in standings},
+        totals={user.id: round_points for user, round_points, tournament_points in standings},
         opted_in=opted_in,
         opt_in_open=opt_in_open,
         opt_in_form=opt_in_form,
@@ -349,7 +349,7 @@ def scores_live():
         ],
         # Live-scored points can move during a match - sent so the players grid's
         # per-user totals stay current on every refresh, not just at page load.
-        totals={str(user.id): points for user, points in tournament_standings()},
+        totals={str(user.id): round_points for user, round_points, tournament_points in round_leaderboard(round_)},
     )
 
 
