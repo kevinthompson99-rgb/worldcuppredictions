@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ user.display_name }} – Predictions{% endblock %}
+{% block content %}
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary mb-3">&larr; {{ user.display_name }}</a>
+  <h1 class="mb-1">Edit Predictions</h1>
+  <p class="text-muted small mb-4">{{ round.name }} &middot; {{ user.display_name }}</p>
+
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <table class="table table-sm table-dark">
+      <thead>
+        <tr>
+          <th>Fixture</th>
+          <th>Kickoff</th>
+          <th class="text-center">Home</th>
+          <th class="text-center">Away</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fixture in fixtures %}
+        {% set pred = predictions.get(fixture.id) %}
+        <tr>
+          <td>{{ fixture.home_team }} v {{ fixture.away_team }}</td>
+          <td class="text-muted small">{{ fixture.kickoff_at.strftime('%a %d %b, %H:%M') }}</td>
+          <td class="text-center" style="width:80px">
+            <input type="number" name="home_{{ fixture.id }}" class="form-control form-control-sm text-center"
+              value="{{ pred.predicted_home if pred else '' }}" min="0" max="99">
+          </td>
+          <td class="text-center" style="width:80px">
+            <input type="number" name="away_{{ fixture.id }}" class="form-control form-control-sm text-center"
+              value="{{ pred.predicted_away if pred else '' }}" min="0" max="99">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="submit" class="btn btn-primary mt-2">Save predictions</button>
+  </form>
+</div>
+{% endblock %}

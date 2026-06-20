@@ -14,6 +14,7 @@ from app.models import (
     ROUND_STATUS_COMPLETE,
     ROUND_STATUS_DRAFT,
     Fixture,
+    Prediction,
     PollLog,
     Round,
     User,
@@ -403,6 +404,53 @@ def edit_user(user_id):
         flash(f"Saved changes to '{user.display_name}'.", "success")
         return redirect(url_for("admin.edit_user", user_id=user.id))
     return render_template("admin/user_detail.html", user=user, form=form, delete_form=CSRFForm())
+
+
+@bp.route("/users/<int:user_id>/predictions", methods=["GET", "POST"])
+def edit_user_predictions(user_id):
+    user = User.query.get_or_404(user_id)
+    round_ = get_active_round()
+    if round_ is None:
+        flash("No active round to edit predictions for.", "warning")
+        return redirect(url_for("admin.edit_user", user_id=user_id))
+
+    fixtures = round_.fixtures.order_by(Fixture.kickoff_at.asc()).all()
+
+    if request.method == "POST":
+        form = CSRFForm()
+        if not form.validate_on_submit():
+            abort(400, description="Invalid or missing CSRF token.")
+        for fixture in fixtures:
+            home_raw = request.form.get(f"home_{fixture.id}", "").strip()
+            away_raw = request.form.get(f"away_{fixture.id}", "").strip()
+            if home_raw == "" or away_raw == "":
+                continue
+            try:
+                home = int(home_raw)
+                away = int(away_raw)
+            except ValueError:
+                flash(f"Invalid score for {fixture.home_team} v {fixture.away_team}.", "danger")
+                continue
+            prediction = Prediction.query.filter_by(user_id=user.id, fixture_id=fixture.id).first()
+            if prediction is None:
+                prediction = Prediction(user_id=user.id, fixture_id=fixture.id, predicted_home=home, predicted_away=away)
+                db.session.add(prediction)
+            else:
+                prediction.predicted_home = home
+                prediction.predicted_away = away
+        db.session.commit()
+        flash(f"Predictions updated for {user.display_name}.", "success")
+        return redirect(url_for("admin.edit_user_predictions", user_id=user_id))
+
+    predictions = {p.fixture_id: p for p in Prediction.query.filter_by(user_id=user.id).join(Fixture).filter(Fixture.round_id == round_.id).all()}
+    return render_template(
+        "admin/user_predictions.html",
+        user=user,
+        round=round_,
+        fixtures=fixtures,
+        predictions=predictions,
+        form=CSRFForm(),
+    )
 
 
 @bp.route("/users/<int:user_id>/delete", methods=["POST"])
