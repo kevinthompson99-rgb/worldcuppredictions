@@ -535,8 +535,11 @@ var matchCountdown = (function () {
   }
 
   // pgrid-top drags horizontally; pgrid-left drags vertically
+  // pgrid-body drags in both axes so touching anywhere in the predictions pane works
   attachTouchScroll(topWrap,  'x');
   attachTouchScroll(leftWrap, 'y');
+  attachTouchScroll(body,     'x');
+  attachTouchScroll(body,     'y');
 
   // --- Init + resize ---
   requestAnimationFrame(function () {
