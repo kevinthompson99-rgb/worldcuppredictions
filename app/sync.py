@@ -89,11 +89,11 @@ def sync_fixtures_and_results(date_from=None, date_to=None):
         score = match.get("score") or {}
         full_time = score.get("fullTime") or {}
         if full_time.get("home") is not None and full_time.get("away") is not None:
-            fixture.home_score_90 = full_time["home"]
-            fixture.away_score_90 = full_time["away"]
-            fixture.winner = _API_WINNER_TO_OUTCOME.get(score.get("winner"))
-
-            if score.get("duration") and score["duration"] != "REGULAR":
+            if not fixture.manually_corrected:
+                fixture.home_score_90 = full_time["home"]
+                fixture.away_score_90 = full_time["away"]
+                fixture.winner = _API_WINNER_TO_OUTCOME.get(score.get("winner"))
+            if score.get("duration") and score["duration"] != "REGULAR" and not fixture.manually_corrected:
                 flagged_for_review.append(fixture)
 
         if not is_new:

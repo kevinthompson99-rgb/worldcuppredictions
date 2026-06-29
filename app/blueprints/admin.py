@@ -347,6 +347,7 @@ def edit_fixture(fixture_id):
     if home_raw.isdigit() and away_raw.isdigit():
         fixture.home_score_90 = int(home_raw)
         fixture.away_score_90 = int(away_raw)
+        fixture.manually_corrected = True
     if winner in ("HOME", "AWAY", "DRAW"):
         fixture.winner = winner
 

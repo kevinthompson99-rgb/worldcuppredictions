@@ -174,6 +174,7 @@ class Fixture(db.Model):
     winner = db.Column(db.String(8), nullable=True)
 
     last_synced_at = db.Column(db.DateTime, nullable=True)
+    manually_corrected = db.Column(db.Boolean, nullable=False, default=False)
 
     predictions = db.relationship("Prediction", back_populates="fixture", lazy="dynamic")
 
