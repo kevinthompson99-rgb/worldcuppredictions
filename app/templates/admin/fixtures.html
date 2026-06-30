@@ -17,6 +17,7 @@
       <div class="admin-row-head">
         <span>{{ fixture.home_team | flag }} {{ fixture.home_short_name or fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_short_name or fixture.away_team }} {{ fixture.away_team | flag }}</span>
         {% if fixture.is_knockout %}<span class="badge bg-info text-dark">knockout</span>{% endif %}
+        {% if fixture.manually_corrected %}<span class="badge bg-warning text-dark">manually corrected</span>{% endif %}
       </div>
       <div class="admin-row-meta">
         <span>{{ fixture.stage }}{% if fixture.group_name %} &middot; {{ fixture.group_name }}{% endif %}</span>
