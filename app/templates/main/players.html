@@ -4,15 +4,15 @@
 {% block content %}
 <div class="players-page">
 
-  {% if round is none %}
-    <p class="players-muted">There's no active round right now &mdash; check back when the next one opens.</p>
+  {% if gameweek is none %}
+    <p class="players-muted">There's no active gameweek right now &mdash; check back when the next one opens.</p>
   {% else %}
 
     <div class="round-card">
       <div class="round-card-row">
-        <span class="round-card-name">{{ round.name }}</span>
+        <span class="round-card-name">{{ gameweek.name }}</span>
         <span class="round-card-deadline">
-          {% if locked %}Locked{% else %}Deadline {{ round.lock_time | london('%a %d %b, %H:%M %Z') }}{% endif %}
+          {% if locked %}Locked{% else %}Deadline {{ gameweek.lock_time | london('%a %d %b, %H:%M %Z') }}{% endif %}
         </span>
       </div>
       <div class="round-card-row">
@@ -20,12 +20,12 @@
         <span class="round-card-players">{{ users|length }}/{{ total_users }} Players</span>
       </div>
       {% if opt_in_open and opt_in_form %}
-        <form method="post" action="{{ url_for('main.round_opt_in') }}" class="opt-in-form">
+        <form method="post" action="{{ url_for('main.gameweek_opt_in') }}" class="opt-in-form">
           {{ opt_in_form.hidden_tag() }}
-          <button type="submit" class="btn btn-warning btn-sm opt-in-btn">Join this round ({{ stake_amount | gbp }})</button>
+          <button type="submit" class="btn btn-accent btn-sm opt-in-btn">Join this gameweek ({{ stake_amount | gbp }})</button>
         </form>
       {% elif not opted_in %}
-        <div class="opt-in-closed">Opt-in is closed for this round &mdash; you weren't entered into the pot.</div>
+        <div class="opt-in-closed">Opt-in is closed for this gameweek &mdash; you weren't entered into the pot.</div>
       {% endif %}
     </div>
 
@@ -47,17 +47,17 @@
     </div>
 
     {% if not grid %}
-      <p class="players-muted">{{ round.name }} doesn't have any fixtures assigned yet.</p>
+      <p class="players-muted">{{ gameweek.name }} doesn't have any fixtures assigned yet.</p>
     {% else %}
 
       {% if not locked and opt_in_open %}
         <p class="players-hint opt-in-prompt">
-          Join this round above to take part in the {{ stake_amount | gbp }} pot &mdash; you'll need to before you can enter predictions.
+          Join this gameweek above to take part in the {{ stake_amount | gbp }} pot &mdash; you'll need to before you can enter predictions.
         </p>
       {% endif %}
 
       {# Four-panel JS-sync grid: corner + top row + left column + scrollable body #}
-      <div class="pgrid-outer" id="pgrid-outer" {% if round %}data-round-id="{{ round.id }}"{% endif %}>
+      <div class="pgrid-outer" id="pgrid-outer" {% if gameweek %}data-gameweek-id="{{ gameweek.id }}"{% endif %}>
 
         <div class="pgrid-corner" id="pgrid-corner">Fixtures ({{ fixtures|length }})</div>
 
@@ -78,13 +78,13 @@
             <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}"{% if locked %} data-live-url="{{ url_for('main.live_match', fixture_id=row.fixture.id) }}"{% endif %}>
               <div class="fixture-teams js-fixture-teams">
                 {% if row.fixture.is_finished %}
-                  {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score_90 }} &ndash; {{ row.fixture.away_score_90 }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
+                  <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score }} &ndash; {{ row.fixture.away_score }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
                 {% elif row.fixture.is_live %}
-                  {% set h = row.fixture.home_score_90 if row.fixture.home_score_90 is not none else 0 %}
-                  {% set a = row.fixture.away_score_90 if row.fixture.away_score_90 is not none else 0 %}
-                  {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
+                  {% set h = row.fixture.home_score if row.fixture.home_score is not none else 0 %}
+                  {% set a = row.fixture.away_score if row.fixture.away_score is not none else 0 %}
+                  <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
                 {% else %}
-                  {{ row.fixture.home_team | flag }} {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_short_name or row.fixture.away_team }} {{ row.fixture.away_team | flag }}
+                  <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
                 {% endif %}
               </div>
               <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
@@ -112,7 +112,7 @@
                  data-fixture-id="{{ row.fixture.id }}"
                  {% if cell.prediction %}data-predicted-home="{{ cell.prediction.predicted_home }}" data-predicted-away="{{ cell.prediction.predicted_away }}"{% endif %}>
               {% if cell.status == 'hidden' %}
-                <span class="cell-icon clock-icon" title="Submitted &mdash; hidden until the round locks">&#9201;</span>
+                <span class="cell-icon clock-icon" title="Submitted &mdash; hidden until the gameweek locks">&#9201;</span>
               {% elif cell.status == 'no_pick' %}
                 <span class="cell-empty" title="No prediction submitted">&ndash;</span>
               {% else %}
@@ -207,12 +207,16 @@ var matchCountdown = (function () {
   var overlayRefreshBtn = document.getElementById('js-overlay-refresh-btn');
   var overlay = document.getElementById('js-refresh-overlay');
   var isRefreshing = false;
-  var isLocked = {{ (round is not none and locked) | tojson }};
+  var isLocked = {{ (gameweek is not none and locked) | tojson }};
 
   function escapeHtml(s) {
     var d = document.createElement('div');
     d.textContent = String(s);
     return d.innerHTML;
+  }
+
+  function crestImg(url) {
+    return '<img src="' + escapeHtml(url || '') + '" alt="" class="team-crest">';
   }
 
   function minuteText(fixture) {
@@ -230,17 +234,17 @@ var matchCountdown = (function () {
 
     if (fixture.status === 'FINISHED' || fixture.status === 'AWARDED') {
       teamsEl.innerHTML =
-        escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
+        crestImg(fixture.home_crest) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-result">' + fixture.home_score + ' &ndash; ' + fixture.away_score + '</span> ' +
-        escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
+        escapeHtml(fixture.away_team) + ' ' + crestImg(fixture.away_crest);
       metaEl.innerHTML = '<span class="fixture-ft">FT</span>';
     } else if (fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED' || fixture.status === 'SUSPENDED') {
       var hs = fixture.home_score !== null ? fixture.home_score : 0;
       var as_ = fixture.away_score !== null ? fixture.away_score : 0;
       teamsEl.innerHTML =
-        escapeHtml(fixture.home_flag) + ' ' + escapeHtml(fixture.home_team) +
+        crestImg(fixture.home_crest) + ' ' + escapeHtml(fixture.home_team) +
         ' <span class="fixture-score-live">(' + hs + ') &ndash; (' + as_ + ')</span> ' +
-        escapeHtml(fixture.away_team) + ' ' + escapeHtml(fixture.away_flag);
+        escapeHtml(fixture.away_team) + ' ' + crestImg(fixture.away_crest);
       if (fixture.status === 'PAUSED') {
         metaEl.innerHTML = '<span class="live-badge live-badge-ht">HT</span>';
       } else {
@@ -596,17 +600,17 @@ var matchCountdown = (function () {
   body.players-body {
     /* Pin the whole document to the viewport - on iOS Safari, overflow:hidden
        alone doesn't stop rubber-band scrolling/bounce on touch drag. Fixing
-       the body removes it from the scrollable area entirely, so LEBIM (the
+       the body removes it from the scrollable area entirely, so LEPREM (the
        first child, in .navbar) can never be dragged off the top. */
     position: fixed;
     inset: 0;
     width: 100%;
-    background: #121417;
+    background: var(--bg);
     display: flex;
     flex-direction: column;
   }
   body.players-body .navbar {
-    background-color: #121417 !important;
+    background-color: var(--bg) !important;
     flex: 0 0 auto;
     margin-bottom: 0.25rem !important;
   }
@@ -636,7 +640,7 @@ var matchCountdown = (function () {
     flex-direction: column;
   }
   .match-countdown {
-    color: #ffd166;
+    color: var(--accent);
     font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.03em;
@@ -650,7 +654,7 @@ var matchCountdown = (function () {
     gap: 0.5rem;
   }
   .players-subtitle, .players-muted, .players-hint {
-    color: #9aa3ad;
+    color: var(--text-muted);
     font-size: 0.85rem;
   }
   .players-muted {
@@ -660,8 +664,8 @@ var matchCountdown = (function () {
     margin: 0.5rem 0;
   }
   .round-card {
-    background: #1f242b;
-    border: 1px solid #2a2f36;
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: 0.6rem;
     padding: 0.45rem 1rem;
   }
@@ -681,17 +685,17 @@ var matchCountdown = (function () {
   }
   .round-card-deadline {
     font-size: 0.8rem;
-    color: #9aa3ad;
+    color: var(--text-muted);
     text-align: right;
   }
   .round-card-pot {
     font-weight: 700;
-    color: #ffd166;
+    color: var(--accent);
     font-size: 1rem;
   }
   .round-card-players {
     font-size: 0.8rem;
-    color: #9aa3ad;
+    color: var(--text-muted);
   }
   .opt-in-form {
     margin-top: 0.6rem;
@@ -702,10 +706,10 @@ var matchCountdown = (function () {
   .opt-in-closed {
     margin-top: 0.6rem;
     font-size: 0.8rem;
-    color: #9aa3ad;
+    color: var(--text-muted);
   }
   .opt-in-prompt {
-    color: #ffd166;
+    color: var(--accent);
   }
   .players-actions {
     display: flex;
@@ -719,14 +723,14 @@ var matchCountdown = (function () {
     justify-content: center;
     width: 2.25rem;
     height: 2.25rem;
-    background: #1f242b;
-    border: 1px solid #2a2f36;
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: 50%;
     text-decoration: none;
     transition: background-color 0.15s ease;
   }
   .players-action-tile:hover {
-    background: #262c34;
+    background: var(--panel-alt);
   }
   button.players-action-tile {
     cursor: pointer;
@@ -735,10 +739,10 @@ var matchCountdown = (function () {
   #js-overlay-refresh-btn {
     background: #000;
     border-color: #333;
-    color: #ffd166;
+    color: var(--accent);
   }
   #js-overlay-refresh-btn:hover {
-    background: #1a1500;
+    background: #132a1a;
   }
   .players-action-icon {
     font-size: 1.05rem;
@@ -753,7 +757,7 @@ var matchCountdown = (function () {
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
-    border: 1px solid #2a2f36;
+    border: 1px solid var(--border);
     border-radius: 0.6rem;
     background: #181b20;
     margin-top: 0.25rem;
@@ -775,10 +779,10 @@ var matchCountdown = (function () {
     align-items: center;
     box-sizing: border-box;
     padding: 0.5rem 0.6rem;
-    background: #1f242b;
-    border-right: 1px solid #262b32;
+    background: var(--panel);
+    border-right: 1px solid var(--border-alt);
     font-size: 0.8rem;
-    color: #9aa3ad;
+    color: var(--text-muted);
     white-space: nowrap;
   }
 
@@ -789,7 +793,7 @@ var matchCountdown = (function () {
     right: 0;
     z-index: 3;
     overflow: hidden;
-    background: #1f242b;
+    background: var(--panel);
     /* left and height set by JS */
   }
 
@@ -804,8 +808,8 @@ var matchCountdown = (function () {
     height: 3rem;
     box-sizing: border-box;
     padding: 0.35rem 0.4rem;
-    border-right: 1px solid #262b32;
-    background: #1f242b;
+    border-right: 1px solid var(--border-alt);
+    background: var(--panel);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -821,7 +825,7 @@ var matchCountdown = (function () {
     z-index: 3;
     overflow: hidden;
     width: var(--pgrid-fix-w);
-    border-top: 1px solid #262b32;
+    border-top: 1px solid var(--border-alt);
     /* top set by JS */
   }
 
@@ -836,16 +840,16 @@ var matchCountdown = (function () {
     box-sizing: border-box;
     width: var(--pgrid-fix-w);
     padding: 0.45rem 0.6rem;
-    border-bottom: 1px solid #262b32;
-    border-right: 1px solid #262b32;
-    background: #1f242b;
+    border-bottom: 1px solid var(--border-alt);
+    border-right: 1px solid var(--border-alt);
+    background: var(--panel);
     text-align: left;
   }
   .pgrid-fixture-cell[data-live-url] {
     cursor: pointer;
   }
   .pgrid-fixture-cell[data-live-url]:active {
-    background: #262c34;
+    background: var(--panel-alt);
   }
 
   /* Body: clipping container — no native scrolling, content moved via JS transforms */
@@ -855,7 +859,7 @@ var matchCountdown = (function () {
     bottom: 0;
     overflow: hidden;
     z-index: 1;
-    border-top: 1px solid #262b32;
+    border-top: 1px solid var(--border-alt);
     /* top and left set by JS */
   }
 
@@ -884,7 +888,7 @@ var matchCountdown = (function () {
     display: block;
     font-size: 0.88rem;
     font-weight: 700;
-    color: #ffd166;
+    color: var(--accent);
     line-height: 1;
   }
 
@@ -894,6 +898,12 @@ var matchCountdown = (function () {
     line-height: 1.25;
     white-space: nowrap;
   }
+  .team-crest {
+    height: 1rem;
+    width: 1rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+  }
   .fixture-teams .vs {
     color: #6c757d;
     font-weight: 400;
@@ -901,7 +911,7 @@ var matchCountdown = (function () {
   .fixture-meta {
     margin-top: 0.15rem;
     font-size: 0.7rem;
-    color: #9aa3ad;
+    color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
   }
@@ -911,7 +921,7 @@ var matchCountdown = (function () {
   }
   .fixture-score-live {
     font-weight: 700;
-    color: #ff6b6b;
+    color: var(--status-wrong);
   }
   .fixture-ft {
     font-weight: 700;
@@ -923,10 +933,10 @@ var matchCountdown = (function () {
     letter-spacing: 0.04em;
   }
   .live-badge-live {
-    color: #51cf66;
+    color: var(--status-correct);
   }
   .live-badge-ht {
-    color: #ffd43b;
+    color: var(--status-pending);
   }
 
   .score-cell {
@@ -934,8 +944,8 @@ var matchCountdown = (function () {
     width: var(--pgrid-col-w);
     box-sizing: border-box;
     padding: 0.45rem 0.4rem;
-    border-bottom: 1px solid #262b32;
-    border-right: 1px solid #262b32;
+    border-bottom: 1px solid var(--border-alt);
+    border-right: 1px solid var(--border-alt);
     background: #181b20;
     display: flex;
     align-items: center;
@@ -952,10 +962,10 @@ var matchCountdown = (function () {
     font-weight: 400;
   }
   .score-cell.pred-correct .cell-score {
-    color: #74c69d;
+    color: var(--toast-text);
   }
   .score-cell.pred-exact .cell-score {
-    color: #ffd166;
+    color: var(--accent);
     font-weight: 700;
   }
   .cell-empty {
@@ -965,7 +975,7 @@ var matchCountdown = (function () {
     margin-left: 0.3rem;
   }
   .clock-icon {
-    color: #f0b429;
+    color: var(--status-hidden);
   }
 
   @media (min-width: 768px) {

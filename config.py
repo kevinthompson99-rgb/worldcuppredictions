@@ -29,7 +29,10 @@ class Config:
     # football-data.org API
     FOOTBALL_DATA_API_KEY = os.environ.get("FOOTBALL_DATA_API_KEY")
     FOOTBALL_DATA_BASE_URL = "https://api.football-data.org/v4"
-    WORLD_CUP_COMPETITION_CODE = "WC"
+    PREMIER_LEAGUE_COMPETITION_CODE = "PL"
+    # The season a fixture list "starts" in, e.g. 2026 for the 2026/27 season. Bump this
+    # (via env var) at the start of each new season rather than editing code.
+    PL_SEASON_YEAR = int(os.environ.get("PL_SEASON_YEAR", "2026"))
 
     # Superuser, created/updated automatically on startup via `flask seed-admin`
     ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME")

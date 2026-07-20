@@ -1,8 +1,51 @@
-# World Cup 2026 Predictions — NOTES
+# LEPREM — NOTES
 
 Progress log, key decisions, and what's needed to resume work.
 
-## Status (2026-06-08)
+## Status (2026-07-20) — Rebuilt as LEPREM (Premier League 2026/27)
+
+Rebuilt the World Cup predictions app (all history below this point) into a Premier
+League 2026/27 season app, rebranded **LEPREM**. Same friend group/accounts carry over;
+World Cup-era rounds/fixtures/predictions/pot history do not (fresh season, clean slate).
+
+Key changes from the World Cup build:
+- **`Round` → `Gameweek`**, keyed on football-data.org's own `matchday` (1-38) instead of
+  an admin-assigned `sequence`. `app/sync.py` now get-or-creates all 38 gameweeks
+  automatically as fixtures sync in (confirmed live: the 2026/27 fixture list, including
+  `matchday`, is fully published) — the admin's job is now just to **publish**/**complete**
+  each one (same DRAFT→ACTIVE→COMPLETE lifecycle as before), not hand-curate fixture
+  assignment. A "rearranged fixture" guard in `sync_fixtures_and_results` protects any
+  fixture already in an ACTIVE/COMPLETE gameweek from being silently re-homed if the API
+  later reports a different matchday for it (flagged for manual review instead, same
+  `PollLog.detail` mechanism the old ET/penalty flag used).
+- **All knockout-only fields dropped**: `Fixture.is_knockout`/`winner`/`stage`/`group_name`
+  and the `_KNOCKOUT_STAGES`/ET-penalty flagging in `sync.py` are gone — a league season
+  has no knockout matches, so `app/scoring.py` (already knockout-agnostic) needed no rule
+  changes, just the `home_score_90`/`away_score_90` → `home_score`/`away_score` rename
+  (final score is final score, no "90-minute vs. ET" distinction to track).
+- **Club crests replace flag emoji**: `Fixture.home_crest_url`/`away_crest_url` are
+  persisted straight from the API's match payload; `app/teams.py` (the flag-emoji lookup)
+  is deleted, along with the `flag` Jinja filter.
+- **Shared `app/static/css/theme.css`** introduced (CSS custom properties for the dark
+  palette) so the turf-green (`#3F8F52`)/chalk-white (`#F5F5F0`) rebrand — replacing the
+  old amber (`#ffd166`) accent — has one place to change instead of six templates each
+  repeating hex literals inline.
+- **PWA re-branded**: manifest name/description, service worker `CACHE_NAME` bumped
+  (`leprem-shell-v1`), and `scripts/gen_icons.py`'s dark panel colour (renamed
+  `BLACK`→`DARK_PANEL`) recoloured to turf green — its `WHITE` constant was already
+  exactly the target chalk white, so no change needed there.
+- **Migration**: one new Alembic migration (`7f2a9c1d4e8b`, on top of the existing 12 —
+  not squashed) drops and recreates `fixtures`/`predictions`/`round_entries`→
+  `gameweek_entries`/`rounds`→`gameweeks`/`poll_logs` with the new schema. `users` is
+  completely untouched. **Not yet run against the real Railway production database** —
+  take a `pg_dump` backup first; this is a destructive schema change for the tables it
+  touches, by design (old World Cup history is not meant to survive the rebrand).
+
+**Not yet done**: production deploy/migration (local SQLite dry run only so far, see
+verification steps in the plan this was built from), and a real in-browser click-through
+of the rebuilt UI.
+
+## Status (2026-06-08) — World Cup 2026 build (historical, superseded above)
 
 Scaffolded and smoke-tested a working Flask + SQLAlchemy + Postgres app. Auth, admin
 round/fixture management, prediction submission + locking, scoring, and both
@@ -480,20 +523,20 @@ run.py                 — entry point / gunicorn target (loads .env via python-
 app/
   __init__.py          — app factory, blueprint registration, `flask seed-admin` CLI command
   extensions.py        — db, migrate, login_manager, csrf (singletons)
-  models.py            — User, Round, Fixture, Prediction
-  forms.py             — WTForms: registration/login, dynamic per-round prediction form, CSRFForm
+  models.py            — User, Gameweek, Fixture, Prediction, GameweekEntry
+  forms.py             — WTForms: registration/login, dynamic per-gameweek prediction form, CSRFForm
   scoring.py           — calculate_points / score_fixture (the rules described above)
-  leaderboards.py      — round_leaderboard / tournament_standings queries
-  round_helpers.py     — get_open_round / get_current_or_most_recent_round
-  football_data.py     — football-data.org v4 API client (matches endpoint)
-  sync.py              — upserts fixtures/results from the API, flags ET/penalty matches, triggers scoring
-  admin_utils.py       — admin_required decorator
+  leaderboards.py      — gameweek_leaderboard / season_standings queries
+  gameweek_helpers.py  — get_active_gameweek / get_draft_gameweek(s) / get_gameweek_for_leaderboard
+  football_data.py     — football-data.org v4 API client (Premier League matches endpoint)
+  sync.py              — upserts fixtures/results from the API, auto-assigns gameweeks by matchday, triggers scoring
+  admin_utils.py        — admin_required decorator
   blueprints/
     auth.py            — register / login / logout
-    main.py            — landing, dashboard, leaderboards, round results (predictions vs actual)
-    predictions.py     — view/submit predictions for the currently open round
-    admin.py           — rounds, fixture assignment, manual fixture correction, sync trigger, user list
-  templates/           — Bootstrap 5 (CDN) templates per blueprint
+    main.py            — landing, dashboard, leaderboards, live match view
+    predictions.py     — view/submit predictions for the currently active gameweek
+    admin.py           — gameweeks, fixture assignment, manual fixture correction, sync trigger, user list
+  templates/           — Bootstrap 5 (CDN) templates per blueprint, shared dark theme in static/css/theme.css
 ```
 
 ## Local dev

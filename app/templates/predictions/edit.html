@@ -5,31 +5,31 @@
 <div class="predictions-page">
   <h1 class="predictions-h1">My predictions</h1>
 
-  {% if round is none %}
-    <p class="predictions-muted">There's no active round right now &mdash; check back when the next one opens.</p>
+  {% if gameweek is none %}
+    <p class="predictions-muted">There's no active gameweek right now &mdash; check back when the next one opens.</p>
   {% elif not fixtures %}
-    <p class="predictions-muted">{{ round.name }} doesn't have any fixtures assigned yet.</p>
+    <p class="predictions-muted">{{ gameweek.name }} doesn't have any fixtures assigned yet.</p>
   {% elif locked %}
     <div class="round-card">
-      <div class="round-card-name">{{ round.name }}</div>
+      <div class="round-card-name">{{ gameweek.name }}</div>
       <div class="round-card-status">Predictions are locked &mdash; head back to the home screen to see how everyone's getting on.</div>
     </div>
     <p class="predictions-muted">
-      <a href="{{ url_for('main.players') }}" class="btn btn-warning btn-sm mt-2">Back to home</a>
+      <a href="{{ url_for('main.players') }}" class="btn btn-accent btn-sm mt-2">Back to home</a>
     </p>
   {% elif not opted_in %}
     <div class="round-card">
-      <div class="round-card-name">{{ round.name }}</div>
-      <div class="round-card-status">Join this round on the home screen to enter your predictions.</div>
+      <div class="round-card-name">{{ gameweek.name }}</div>
+      <div class="round-card-status">Join this gameweek on the home screen to enter your predictions.</div>
     </div>
     <p class="predictions-muted">
-      <a href="{{ url_for('main.players') }}" class="btn btn-warning btn-sm mt-2">Go to home screen</a>
+      <a href="{{ url_for('main.players') }}" class="btn btn-accent btn-sm mt-2">Go to home screen</a>
     </p>
   {% else %}
     <div class="round-card">
-      <div class="round-card-name">{{ round.name }}</div>
+      <div class="round-card-name">{{ gameweek.name }}</div>
       <div class="round-card-status">
-        Predictions lock <strong>{{ round.lock_time | london('%a %d %b, %H:%M %Z') }}</strong>
+        Predictions lock <strong>{{ gameweek.lock_time | london('%a %d %b, %H:%M %Z') }}</strong>
       </div>
     </div>
 
@@ -39,9 +39,9 @@
         {% for fixture in fixtures %}
           <li class="fixture-row">
             <div class="fixture-teams">
-              {{ fixture.home_team | flag }} {{ fixture.home_team }}
+              <img src="{{ fixture.home_crest_url }}" alt="" class="team-crest"> {{ fixture.home_team }}
               <span class="vs">v</span>
-              {{ fixture.away_team }} {{ fixture.away_team | flag }}
+              {{ fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="team-crest">
             </div>
             <div class="fixture-score-entry">
               {{ form["home_" ~ fixture.id](class_="score-input") }}
@@ -58,23 +58,23 @@
         {% endfor %}
       </ul>
       <div class="predictions-actions">
-        <button type="submit" class="btn btn-warning btn-lg">Save my predictions</button>
+        <button type="submit" class="btn btn-accent btn-lg">Save my predictions</button>
       </div>
     </form>
 
     <p class="predictions-hint">
-      Your picks stay hidden from everyone else (and on the Players grid, shown only as a clock icon) until the round locks.
+      Your picks stay hidden from everyone else (and on the Players grid, shown only as a clock icon) until the gameweek locks.
     </p>
   {% endif %}
 </div>
 
 <style>
   body.predictions-body {
-    background: #121417;
+    background: var(--bg);
   }
   body.predictions-body .navbar,
   body.predictions-body footer {
-    background-color: #121417 !important;
+    background-color: var(--bg) !important;
   }
   .predictions-page {
     color: #e9ecef;
@@ -85,7 +85,7 @@
     margin-bottom: 0.75rem;
   }
   .predictions-muted, .predictions-hint {
-    color: #9aa3ad;
+    color: var(--text-muted);
     font-size: 0.85rem;
   }
   .predictions-hint {
@@ -93,8 +93,8 @@
   }
 
   .round-card {
-    background: #1f242b;
-    border: 1px solid #2a2f36;
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: 0.6rem;
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
@@ -107,7 +107,7 @@
   .round-card-status {
     margin-top: 0.2rem;
     font-size: 0.8rem;
-    color: #9aa3ad;
+    color: var(--text-muted);
   }
 
   .fixture-list {
@@ -120,7 +120,7 @@
   }
   .fixture-row {
     background: #1a1e24;
-    border: 1px solid #2a2f36;
+    border: 1px solid var(--border);
     border-radius: 0.6rem;
     padding: 0.75rem 1rem;
     display: flex;
@@ -140,9 +140,15 @@
     font-weight: 400;
     margin: 0 0.3rem;
   }
+  .team-crest {
+    height: 1.1rem;
+    width: 1.1rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+  }
   .fixture-meta {
     font-size: 0.75rem;
-    color: #9aa3ad;
+    color: var(--text-muted);
   }
   .fixture-score-entry {
     display: flex;
@@ -150,13 +156,13 @@
     gap: 0.5rem;
   }
   .fixture-score-entry .dash {
-    color: #9aa3ad;
+    color: var(--text-muted);
     font-size: 1.1rem;
   }
   .score-input {
     width: 2.6rem;
     text-align: center;
-    background: #121417;
+    background: var(--bg);
     border: 1px solid #3a4048;
     border-radius: 0.4rem;
     color: #fff;
@@ -165,11 +171,11 @@
   }
   .score-input:focus {
     outline: none;
-    border-color: #ffc107;
+    border-color: var(--accent);
   }
   .score-error {
     width: 100%;
-    color: #ef6b6b;
+    color: var(--status-wrong);
     font-size: 0.75rem;
     margin-top: 0.25rem;
   }

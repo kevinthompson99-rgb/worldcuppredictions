@@ -1,0 +1,41 @@
+/* LEPREM dark theme - shared palette for the dark PWA screens (players/leaderboard/
+   predictions/live-match/about/base). Admin's Bootstrap-light templates don't use this.
+
+   Turf green + chalk white replace the old amber accent; the charcoal background/panel
+   layer is unchanged from the World Cup build. */
+:root {
+  --bg: #121417;
+  --panel: #1f242b;
+  --panel-alt: #262c34;
+  --border: #2a2f36;
+  --border-alt: #262b32;
+
+  --accent: #3F8F52;
+  --highlight: #F5F5F0;
+  --text-muted: #9aa3ad;
+
+  --status-wrong: #ff6b6b;
+  --status-correct: #51cf66;
+  --status-exact: #6ee7a0;
+  --status-pending: #ffd43b;
+  --status-hidden: #f0b429;
+
+  --toast-bg: #1a2a1e;
+  --toast-border: #2d4a35;
+  --toast-text: #74c69d;
+}
+
+/* Primary CTA button on the dark screens - Bootstrap's own `.btn-warning` is a fixed
+   amber, independent of the palette above, so the main "Join gameweek"/"Save
+   predictions"/"Back to home" actions use this instead to stay on-brand. */
+.btn-accent {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: #0d1310;
+}
+.btn-accent:hover,
+.btn-accent:focus {
+  background-color: #357a46;
+  border-color: #357a46;
+  color: #0d1310;
+}

@@ -2,8 +2,8 @@
 {% block title %}Welcome{% endblock %}
 {% block content %}
 <div class="px-4 py-5 text-center">
-  <h1 class="display-5 fw-bold">World Cup 2026 Predictions</h1>
-  <p class="lead">Predict every match score, earn points for the round, and climb the tournament leaderboard with your friends.</p>
+  <h1 class="display-5 fw-bold">LEPREM</h1>
+  <p class="lead">Predict every Premier League match score, earn points for the gameweek, and climb the season leaderboard with your friends.</p>
   <div class="d-flex justify-content-center gap-2">
     <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg">Sign up</a>
     <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary btn-lg">Log in</a>
@@ -19,12 +19,12 @@
       </ul>
     </div>
     <div class="col-md-4">
-      <h5>Rounds</h5>
-      <p>The admin curates each round of fixtures - from group stage weeks through to the Final. Predictions lock 5 minutes before the round's first kick-off.</p>
+      <h5>Gameweeks</h5>
+      <p>All 38 Premier League gameweeks are synced in automatically as the season's fixtures are confirmed. The admin publishes each one when it's ready; predictions lock 5 minutes before the gameweek's first kick-off.</p>
     </div>
     <div class="col-md-4">
-      <h5>Knockout matches</h5>
-      <p>Scored on the 90-minute result, just like every other match &mdash; a draw at 90 minutes counts as a correct result too. What happens in extra time or penalties doesn't affect scoring.</p>
+      <h5>Every match counts</h5>
+      <p>Every fixture is scored on its full-time result &mdash; a draw is just as valid a prediction as a win, every single gameweek.</p>
     </div>
   </div>
 </div>

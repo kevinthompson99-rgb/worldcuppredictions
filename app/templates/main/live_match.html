@@ -4,8 +4,8 @@
 {% block content %}
 
 {# Shorthand for current score (null-safe) #}
-{% set h_score = fixture.home_score_90 if fixture.home_score_90 is not none else 0 %}
-{% set a_score = fixture.away_score_90 if fixture.away_score_90 is not none else 0 %}
+{% set h_score = fixture.home_score if fixture.home_score is not none else 0 %}
+{% set a_score = fixture.away_score if fixture.away_score is not none else 0 %}
 {% if fixture.status == 'PAUSED' %}
   {% set minute_text = 'HT' %}
 {% elif fixture.is_finished %}
@@ -41,7 +41,7 @@
 
     <div class="lm-match-row">
       <div class="lm-team lm-team-home">
-        <span class="lm-team-flag">{{ home_flag }}</span>
+        <img src="{{ home_crest }}" alt="" class="lm-team-crest">
         <span class="lm-team-name">{{ fixture.home_short_name or fixture.home_team }}</span>
       </div>
 
@@ -55,7 +55,7 @@
       </div>
 
       <div class="lm-team lm-team-away">
-        <span class="lm-team-flag">{{ away_flag }}</span>
+        <img src="{{ away_crest }}" alt="" class="lm-team-crest">
         <span class="lm-team-name">{{ fixture.away_short_name or fixture.away_team }}</span>
       </div>
     </div>
@@ -239,12 +239,12 @@
     position: fixed;
     inset: 0;
     width: 100%;
-    background: #121417;
+    background: var(--bg);
     display: flex;
     flex-direction: column;
   }
   body.live-match-body .navbar {
-    background-color: #121417 !important;
+    background-color: var(--bg) !important;
     flex: 0 0 auto;
     margin-bottom: 0 !important;
   }
@@ -275,7 +275,7 @@
     display: flex;
     flex-direction: column;
     background: #0d1117;
-    border-bottom: 1px solid #2a2f36;
+    border-bottom: 1px solid var(--border);
     padding: 0.5rem 0.75rem 0.6rem;
     box-sizing: border-box;
   }
@@ -288,12 +288,12 @@
   }
   .lm-home-btn {
     margin-bottom: 0 !important;
-    color: #ffd166 !important;
+    color: var(--accent) !important;
     text-decoration: none;
     font-size: 0.85rem;
   }
   .lm-home-btn:hover {
-    color: #ffe599 !important;
+    color: #8fd39f !important;
   }
   .lm-action-tile {
     display: inline-flex;
@@ -306,11 +306,11 @@
     border-radius: 50%;
     cursor: pointer;
     padding: 0;
-    color: #ffd166;
+    color: var(--accent);
     transition: background-color 0.15s ease;
   }
   .lm-action-tile:hover {
-    background: #1a1500;
+    background: #132a1a;
   }
   .lm-action-icon {
     font-size: 1.05rem;
@@ -335,7 +335,7 @@
     transition: background 0.2s;
   }
   .lm-dot-active {
-    background: #ffd166;
+    background: var(--accent);
   }
 
   /* Three-column layout: home team | score | away team */
@@ -356,9 +356,10 @@
     min-width: 0;
     gap: 0.2rem;
   }
-  .lm-team-flag {
-    font-size: 2rem;
-    line-height: 1;
+  .lm-team-crest {
+    height: 2rem;
+    width: 2rem;
+    object-fit: contain;
   }
   .lm-team-name {
     font-size: 0.72rem;
@@ -396,7 +397,7 @@
     margin-top: 0.3rem;
     font-size: 0.95rem;
     font-weight: 700;
-    color: #ffd166;
+    color: var(--accent);
     letter-spacing: 0.06em;
   }
 
@@ -406,7 +407,7 @@
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background: #121417;
+    background: var(--bg);
   }
   .lm-no-preds {
     color: #6c757d;
@@ -448,15 +449,15 @@
     /* Right pair: subtle left rule on the name cell */
   }
   .lm-pred-table > *:nth-child(4n+3) {
-    border-left: 1px solid #2a2f36;
+    border-left: 1px solid var(--border);
   }
   .lm-pred-filler {
     border-bottom: 1px solid #1e2227;
   }
 
   /* Prediction status colours */
-  .lm-pred-exact   { color: #ffd166; font-weight: 800; }
-  .lm-pred-correct { color: #74c69d; font-weight: 700; }
+  .lm-pred-exact   { color: var(--accent); font-weight: 800; }
+  .lm-pred-correct { color: var(--toast-text); font-weight: 700; }
   .lm-pred-wrong   { color: #6c757d; font-weight: 400; }
   .lm-pred-pending { color: #4a5260; font-weight: 400; }
   .lm-pred-no_pick { color: #3a4048; font-weight: 400; }

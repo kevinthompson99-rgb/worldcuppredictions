@@ -170,10 +170,10 @@ def register_cli(app):
 
     @app.cli.command("seed-test-data")
     def seed_test_data():
-        """Seed two opted-in test players with predictions and a round in progress.
+        """Seed two opted-in test players with predictions and a gameweek in progress.
 
-        For local/dev use against the active round only - creates/updates "Alice" and
-        "Bruno" (password "test123"), opts them into the active round, marks its first
+        For local/dev use against the active gameweek only - creates/updates "Alice" and
+        "Bruno" (password "test123"), opts them into the active gameweek, marks its first
         three fixtures as finished (2-1 home win, 0-0 draw, 1-2 away win), gives both
         users a prediction for every fixture (Alice's first three match the results
         exactly; Bruno's are 2-1/1-1/1-0; remaining fixtures get a random 0-3 score for
@@ -187,13 +187,13 @@ def register_cli(app):
         import random
 
         from app.extensions import db
-        from app.models import OUTCOME_AWAY, OUTCOME_DRAW, OUTCOME_HOME, Prediction, RoundEntry, User
-        from app.round_helpers import get_active_round
+        from app.models import GameweekEntry, Prediction, User
+        from app.gameweek_helpers import get_active_gameweek
         from app.scoring import score_fixture
 
-        round_ = get_active_round()
-        if round_ is None:
-            click.echo("No active round - nothing to seed.")
+        gameweek = get_active_gameweek()
+        if gameweek is None:
+            click.echo("No active gameweek - nothing to seed.")
             return
 
         users = {}
@@ -212,16 +212,16 @@ def register_cli(app):
         db.session.flush()
 
         for user in users.values():
-            entry = RoundEntry.query.filter_by(user_id=user.id, round_id=round_.id).first()
+            entry = GameweekEntry.query.filter_by(user_id=user.id, gameweek_id=gameweek.id).first()
             if entry is None:
-                entry = RoundEntry(user_id=user.id, round_id=round_.id, opted_in=True)
+                entry = GameweekEntry(user_id=user.id, gameweek_id=gameweek.id, opted_in=True)
                 db.session.add(entry)
             else:
                 entry.opted_in = True
 
-        fixtures = round_.fixtures.all()
+        fixtures = gameweek.fixtures.all()
 
-        # Results for the first three fixtures, simulating a round in progress.
+        # Results for the first three fixtures, simulating a gameweek in progress.
         RESULTS = [(2, 1), (0, 0), (1, 2)]
         # Alice's predictions match the first three results exactly (max points);
         # Bruno's are close but only nail the first one.
@@ -246,24 +246,18 @@ def register_cli(app):
         db.session.commit()
 
         click.echo(f"Seeded users: {', '.join(users.keys())} (password: test123)")
-        click.echo(f"Opted both into '{round_.name}' and seeded {len(fixtures)} prediction(s) each.")
+        click.echo(f"Opted both into '{gameweek.name}' and seeded {len(fixtures)} prediction(s) each.")
 
         if not fixtures:
-            click.echo(f"{round_.name} has no fixtures - nothing to score.")
+            click.echo(f"{gameweek.name} has no fixtures - nothing to score.")
             return
 
         # Mark the first len(RESULTS) fixtures (by kickoff) as finished with the scores above.
         total_updated = 0
         for fixture, (home_score, away_score) in zip(fixtures, RESULTS):
-            fixture.home_score_90 = home_score
-            fixture.away_score_90 = away_score
+            fixture.home_score = home_score
+            fixture.away_score = away_score
             fixture.status = "FINISHED"
-            if home_score > away_score:
-                fixture.winner = OUTCOME_HOME
-            elif away_score > home_score:
-                fixture.winner = OUTCOME_AWAY
-            else:
-                fixture.winner = OUTCOME_DRAW
         db.session.commit()
 
         for fixture, _ in zip(fixtures, RESULTS):
@@ -272,16 +266,16 @@ def register_cli(app):
 
         for fixture, _ in zip(fixtures, RESULTS):
             click.echo(
-                f"Marked '{fixture.home_team} {fixture.home_score_90}-{fixture.away_score_90} "
+                f"Marked '{fixture.home_team} {fixture.home_score}-{fixture.away_score} "
                 f"{fixture.away_team}' as finished."
             )
         click.echo(f"Rescored {total_updated} prediction(s) across {min(len(fixtures), len(RESULTS))} fixture(s).")
 
     @app.cli.command("reset-dev")
     def reset_dev():
-        """Wipe the dev database back to a clean slate: no rounds, no players, no predictions.
+        """Wipe the dev database back to a clean slate: no gameweeks, no players, no predictions.
 
-        Deletes all predictions, round entries, rounds, and non-admin users, and resets
+        Deletes all predictions, gameweek entries, gameweeks, and non-admin users, and resets
         every fixture's score/status back to a not-yet-played state - then re-seeds the
         admin account. Refuses to run with FLASK_ENV=production.
         """
@@ -290,24 +284,23 @@ def register_cli(app):
             return
 
         from app.extensions import db
-        from app.models import Fixture, Prediction, Round, RoundEntry, User
+        from app.models import Fixture, Gameweek, GameweekEntry, Prediction, User
 
         predictions_count = Prediction.query.delete()
-        round_entries_count = RoundEntry.query.delete()
+        gameweek_entries_count = GameweekEntry.query.delete()
 
-        # Fixtures reference rounds via round_id - clear that (and flush) before
-        # deleting rounds, or the DELETE will violate the foreign key constraint.
+        # Fixtures reference gameweeks via gameweek_id - clear that (and flush) before
+        # deleting gameweeks, or the DELETE will violate the foreign key constraint.
         fixtures = Fixture.query.all()
         for fixture in fixtures:
-            fixture.round_id = None
-            fixture.home_score_90 = None
-            fixture.away_score_90 = None
-            fixture.winner = None
+            fixture.gameweek_id = None
+            fixture.home_score = None
+            fixture.away_score = None
             fixture.status = "TIMED"
             fixture.last_synced_at = None
         db.session.flush()
 
-        rounds_count = Round.query.delete()
+        gameweeks_count = Gameweek.query.delete()
         users_count = User.query.filter_by(is_admin=False).delete()
 
         db.session.commit()
@@ -316,10 +309,10 @@ def register_cli(app):
 
         click.echo("Reset dev database:")
         click.echo(f"  Deleted {predictions_count} prediction(s).")
-        click.echo(f"  Deleted {round_entries_count} round entry/entries.")
-        click.echo(f"  Deleted {rounds_count} round(s).")
+        click.echo(f"  Deleted {gameweek_entries_count} gameweek entry/entries.")
+        click.echo(f"  Deleted {gameweeks_count} gameweek(s).")
         click.echo(f"  Deleted {users_count} non-admin user(s).")
-        click.echo(f"  Reset {len(fixtures)} fixture(s) to TIMED with scores cleared and unassigned from rounds.")
+        click.echo(f"  Reset {len(fixtures)} fixture(s) to TIMED with scores cleared and unassigned from gameweeks.")
         if user is None:
             click.echo("  ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD must all be set - admin user not seeded.")
         else:
@@ -345,19 +338,12 @@ def register_template_helpers(app):
         sign = "-" if amount < 0 else ("+" if signed else "")
         return f"{sign}£{abs(amount):.2f}"
 
-    @app.template_filter("flag")
-    def format_team_flag(team_name):
-        """Render a national team's flag emoji, or '' if the team isn't recognised."""
-        from app.teams import flag_for
-
-        return flag_for(team_name)
-
     @app.template_filter("london")
     def format_london_time(value, fmt="%a %d %b, %H:%M %Z"):
         """Render a naive UTC datetime (as stored in the DB) in UK local time.
 
         Converts via Europe/London so kick-offs display correctly whether the
-        UK is on GMT or BST (e.g. the 2026 World Cup runs during BST) - the
+        UK is on GMT or BST (a Premier League season spans both) - the
         `%Z` in the default format then renders the right abbreviation for the
         date in question, rather than a hard-coded "UTC"/"BST" label.
         """

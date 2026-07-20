@@ -1,7 +1,7 @@
 {
-  "name": "World Cup Predictions",
-  "short_name": "WC Predictions",
-  "description": "Predict World Cup 2026 scores and track the pot with friends.",
+  "name": "LEPREM",
+  "short_name": "LEPREM",
+  "description": "Predict Premier League scores and track the pot with friends.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -21,8 +21,8 @@ import struct
 import zlib
 
 BG = (0x12, 0x14, 0x17)     # #121417 - app background, kept behind the ball
-WHITE = (0xf5, 0xf5, 0xf0)  # ball's light panels
-BLACK = (0x16, 0x18, 0x1b)  # ball's dark panels + outline (near-black, not pure)
+WHITE = (0xf5, 0xf5, 0xf0)  # ball's light panels - already exactly LEPREM's chalk white
+DARK_PANEL = (0x3f, 0x8f, 0x52)  # ball's dark panels + outline - LEPREM's turf green accent
 
 
 # ---- Geometry: build the hex-panel ball as a list of (polygon, fill) ----
@@ -53,7 +53,7 @@ def build_ball(radius, hex_size):
             cx, cy = axial_to_pixel(q, r, hex_size)
             if math.hypot(cx, cy) > radius + hex_size:
                 continue
-            fill = BLACK if (q - r) % 3 == 0 else WHITE
+            fill = DARK_PANEL if (q - r) % 3 == 0 else WHITE
             panels.append((hex_corners(cx, cy, hex_size), fill))
     return panels
 
@@ -67,7 +67,7 @@ def render_svg(size, panels, ball_radius, ring_width):
         f'  <rect width="{size}" height="{size}" fill="rgb{BG}"/>',
         f'  <defs><clipPath id="ball"><circle cx="{cx}" cy="{cy}" r="{ball_radius}"/></clipPath></defs>',
         f'  <circle cx="{cx}" cy="{cy}" r="{ball_radius + ring_width / 2}" '
-        f'fill="none" stroke="rgb{BLACK}" stroke-width="{ring_width}"/>',
+        f'fill="none" stroke="rgb{DARK_PANEL}" stroke-width="{ring_width}"/>',
         f'  <circle cx="{cx}" cy="{cy}" r="{ball_radius}" fill="rgb{WHITE}"/>',
         '  <g clip-path="url(#ball)">',
     ]
@@ -103,7 +103,7 @@ def make_pixel_fn(size, panels, ball_radius, ring_width):
         if dist > ball_radius + ring_width:
             return BG
         if dist > ball_radius:
-            return BLACK
+            return DARK_PANEL
         for points, fill in panels:
             if point_in_polygon(px, py, points):
                 return fill

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ gameweek.name }}{% endblock %}
+{% block content %}
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <h1 class="mb-1">{{ gameweek.name }}</h1>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      {% if gameweek.lock_time %}
+        <p class="mb-1">
+          <strong>Locks at {{ gameweek.lock_time | london('%a %d %b %Y, %H:%M %Z') }}</strong>
+          <span class="text-muted">(5 minutes before {{ gameweek.earliest_kickoff | london('%H:%M %Z') }} kick-off)</span>
+        </p>
+      {% else %}
+        <p class="mb-1 text-muted">Lock time will be set automatically once fixtures are assigned &mdash; it's always 5 minutes before the gameweek's earliest kick-off.</p>
+      {% endif %}
+      <p class="mb-2">
+        Status:
+        {% if gameweek.status == 'DRAFT' %}<span class="badge bg-secondary">Draft &mdash; admin only</span>
+        {% elif gameweek.status == 'ACTIVE' %}
+          {% if gameweek.is_locked %}<span class="badge bg-info text-dark">Active &mdash; locked, in progress</span>
+          {% else %}<span class="badge bg-success">Active &mdash; open for predictions</span>
+          {% endif %}
+        {% else %}<span class="badge bg-dark">Complete &amp; archived</span>
+        {% endif %}
+      </p>
+
+      <p class="mb-2">
+        Stake: <strong>{{ gameweek.stake_amount | gbp }}</strong>
+      </p>
+      <form method="post" action="{{ url_for('admin.set_stake', gameweek_id=gameweek.id) }}" class="d-flex gap-2 align-items-center mb-3" style="max-width: 14rem;">
+        {{ form.hidden_tag() }}
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">£</span>
+          <input type="text" inputmode="decimal" name="stake_amount" class="form-control" placeholder="{{ gameweek.stake_amount }}">
+        </div>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Set</button>
+      </form>
+
+      {% if gameweek.status == 'DRAFT' %}
+        <form method="post" action="{{ url_for('admin.publish_gameweek', gameweek_id=gameweek.id) }}" class="d-inline">
+          {{ form.hidden_tag() }}
+          <button type="submit" class="btn btn-success btn-sm">Publish this gameweek &mdash; make it active</button>
+        </form>
+        <p class="text-muted small mt-2 mb-0">
+          Publishing requires: at least one fixture assigned, no other gameweek currently active,
+          and the lock time (5 minutes before earliest kick-off) not yet passed.
+          {% if active_gameweek %}<br><strong>{{ active_gameweek.name }}</strong> is currently active &mdash; mark it complete first.{% endif %}
+        </p>
+      {% elif gameweek.status == 'ACTIVE' %}
+        <form method="post" action="{{ url_for('admin.complete_gameweek', gameweek_id=gameweek.id) }}" class="d-inline">
+          {{ form.hidden_tag() }}
+          <button type="submit" class="btn btn-dark btn-sm" {% if not gameweek.is_locked %}disabled{% endif %}>Mark as complete &amp; archive</button>
+        </form>
+        {% if not gameweek.is_locked %}
+          <form method="post" action="{{ url_for('admin.force_lock_gameweek', gameweek_id=gameweek.id) }}" class="d-inline">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-outline-warning btn-sm">Force Lock</button>
+          </form>
+          <p class="text-muted small mt-2 mb-0">This gameweek must lock (predictions close) before it can be marked complete.</p>
+          <p class="text-muted small mt-1 mb-0">
+            <strong>Force Lock</strong> immediately locks this gameweek for testing, regardless of kick-off times.
+          </p>
+        {% elif not gameweek.all_fixtures_settled %}
+          <p class="text-warning small mt-2 mb-0">Not every fixture has a final score yet &mdash; you can still complete it, but double-check results first.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <h5>Fixtures in this gameweek</h5>
+  <ul class="admin-list">
+    {% for fixture in fixtures %}
+    <li class="admin-row">
+      <div class="admin-row-head">
+        <span><img src="{{ fixture.home_crest_url }}" alt="" class="admin-crest"> {{ fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="admin-crest"></span>
+      </div>
+      <div class="admin-row-meta">
+        <span>{{ fixture.kickoff_at | london('%a %d %b %Y, %H:%M %Z') }}</span>
+      </div>
+      {% if not gameweek.is_locked %}
+      <div class="admin-row-actions">
+        <form method="post" action="{{ url_for('admin.unassign_fixture', fixture_id=fixture.id) }}">
+          {{ form.hidden_tag() }}
+          <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+        </form>
+      </div>
+      {% endif %}
+    </li>
+    {% else %}
+    <li class="admin-empty">No fixtures assigned yet &mdash; pick some from the list below.</li>
+    {% endfor %}
+  </ul>
+
+  <h5>Add fixtures to this gameweek</h5>
+  {% if gameweek.is_locked %}
+    <p class="text-muted">This gameweek has locked, so fixtures can no longer be assigned to it.</p>
+  {% elif unassigned %}
+  <form method="post" action="{{ url_for('admin.assign_fixtures', gameweek_id=gameweek.id) }}">
+    {{ form.hidden_tag() }}
+    <ul class="admin-list">
+      {% for fixture in unassigned %}
+      <li class="admin-row">
+        <label class="d-flex gap-2 align-items-start" style="cursor: pointer;">
+          <input type="checkbox" class="form-check-input mt-1 flex-shrink-0" name="fixture_ids" value="{{ fixture.id }}">
+          <span>
+            <span class="admin-row-head">
+              <img src="{{ fixture.home_crest_url }}" alt="" class="admin-crest"> {{ fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="admin-crest">
+            </span>
+            <span class="admin-row-meta">
+              <span>{{ fixture.kickoff_at | london('%a %d %b %Y, %H:%M %Z') }}</span>
+            </span>
+          </span>
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    <button type="submit" class="btn btn-primary btn-sm">Assign selected fixtures to this gameweek</button>
+  </form>
+  {% else %}
+    <p class="text-muted">
+      No unassigned fixtures available &mdash; this normally only happens if a fixture was
+      flagged after a rearrangement (see the admin dashboard's polling status) and needs
+      manually re-homing here.
+    </p>
+  {% endif %}
+</div>
+<style>
+  .admin-crest {
+    height: 1.1em;
+    width: 1.1em;
+    object-fit: contain;
+    vertical-align: -0.2em;
+  }
+</style>
+{% endblock %}

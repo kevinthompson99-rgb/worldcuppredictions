@@ -5,16 +5,16 @@
 <div class="admin-page">
   <h1 class="mb-1">Pot &amp; finances</h1>
   <p class="text-muted mb-4">
-    Per-round opt-in pots and settlements &mdash; £5 a head, winner(s) take the pot, everyone else loses their stake.
+    Per-gameweek opt-in pots and settlements &mdash; winner(s) take the pot, everyone else loses their stake.
     Nothing here moves real money; it's tracked for reference and settled externally between players.
   </p>
 
-  {% for round_, summary in summaries %}
+  {% for gameweek, summary in summaries %}
     <div class="card bg-dark text-light mb-3">
       <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <span>
-          <strong>{{ round_.name }}</strong>
-          <span class="badge bg-{{ 'success' if round_.status == 'COMPLETE' else ('info text-dark' if round_.status == 'ACTIVE' else 'secondary') }} ms-2">{{ round_.status }}</span>
+          <strong>{{ gameweek.name }}</strong>
+          <span class="badge bg-{{ 'success' if gameweek.status == 'COMPLETE' else ('info text-dark' if gameweek.status == 'ACTIVE' else 'secondary') }} ms-2">{{ gameweek.status }}</span>
         </span>
         <span class="text-muted small">
           {{ summary.entrant_count }} opted in &middot; pot {{ summary.pot | gbp }}
@@ -29,7 +29,7 @@
                 <span class="text-muted small">#{{ loop.index }}</span>
                 {{ row.user.username }}
                 {% if row.is_winner %}<span class="badge bg-warning text-dark">winner</span>{% endif %}
-                <span class="text-muted small ms-1">{{ row.round_points }} pt{{ '' if row.round_points == 1 else 's' }}</span>
+                <span class="text-muted small ms-1">{{ row.gameweek_points }} pt{{ '' if row.gameweek_points == 1 else 's' }}</span>
               </span>
               <span class="{{ 'text-success' if row.financial_result and row.financial_result > 0 else ('text-danger' if row.financial_result and row.financial_result < 0 else 'text-muted') }}">
                 {% if row.financial_result is none %}
@@ -42,11 +42,11 @@
           {% endfor %}
         </ul>
       {% else %}
-        <div class="card-body text-muted">No one opted in to this round.</div>
+        <div class="card-body text-muted">No one opted in to this gameweek.</div>
       {% endif %}
     </div>
   {% else %}
-    <p class="text-muted">No rounds have been created yet.</p>
+    <p class="text-muted">No gameweeks have been created yet.</p>
   {% endfor %}
 </div>
 {% endblock %}

@@ -1,4 +1,4 @@
-"""Leaderboard queries: round-level points and cumulative tournament standings.
+"""Leaderboard queries: gameweek-level points and cumulative season standings.
 
 Both are simple sums over `Prediction.points`, which is populated once a fixture
 finishes and scoring runs (see app.scoring.score_fixture).
@@ -7,63 +7,63 @@ finishes and scoring runs (see app.scoring.score_fixture).
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models import Fixture, Prediction, Round, User
+from app.models import Fixture, Gameweek, Prediction, User
 
 
-def round_leaderboard(round_: Round):
-    """List of (user, round_points, tournament_points) for a single round, highest
-    round_points first. Includes users with 0 in either column.
+def gameweek_leaderboard(gameweek: Gameweek):
+    """List of (user, gameweek_points, season_points) for a single gameweek, highest
+    gameweek_points first. Includes users with 0 in either column.
 
-    Surfacing the tournament total alongside the round total lets users see, as results
-    come in during a round, both how they're doing this round *and* where that leaves
-    them overall - without a separate page lookup (see main.leaderboard, and
-    app.finance.round_financial_summary which layers the pot settlement on top).
+    Surfacing the season total alongside the gameweek total lets users see, as results
+    come in during a gameweek, both how they're doing this gameweek *and* where that
+    leaves them overall - without a separate page lookup (see main.leaderboard, and
+    app.finance.gameweek_financial_summary which layers the pot settlement on top).
     """
-    round_points = (
+    gameweek_points = (
         db.session.query(
             Prediction.user_id.label("user_id"),
-            func.coalesce(func.sum(Prediction.points), 0).label("round_points"),
+            func.coalesce(func.sum(Prediction.points), 0).label("gameweek_points"),
         )
         .join(Fixture, Fixture.id == Prediction.fixture_id)
-        .filter(Fixture.round_id == round_.id)
+        .filter(Fixture.gameweek_id == gameweek.id)
         .group_by(Prediction.user_id)
         .subquery()
     )
-    tournament_points = (
+    season_points = (
         db.session.query(
             Prediction.user_id.label("user_id"),
-            func.coalesce(func.sum(Prediction.points), 0).label("tournament_points"),
+            func.coalesce(func.sum(Prediction.points), 0).label("season_points"),
         )
         .join(Fixture, Fixture.id == Prediction.fixture_id)
-        .join(Round, Round.id == Fixture.round_id)
-        .filter(Round.status == "COMPLETE")
+        .join(Gameweek, Gameweek.id == Fixture.gameweek_id)
+        .filter(Gameweek.status == "COMPLETE")
         .group_by(Prediction.user_id)
         .subquery()
     )
     rows = (
         db.session.query(
             User,
-            func.coalesce(round_points.c.round_points, 0).label("round_points"),
-            func.coalesce(tournament_points.c.tournament_points, 0).label("tournament_points"),
+            func.coalesce(gameweek_points.c.gameweek_points, 0).label("gameweek_points"),
+            func.coalesce(season_points.c.season_points, 0).label("season_points"),
         )
-        .outerjoin(round_points, round_points.c.user_id == User.id)
-        .outerjoin(tournament_points, tournament_points.c.user_id == User.id)
-        .order_by(db.desc("round_points"), db.desc("tournament_points"), User.display_name.asc())
+        .outerjoin(gameweek_points, gameweek_points.c.user_id == User.id)
+        .outerjoin(season_points, season_points.c.user_id == User.id)
+        .order_by(db.desc("gameweek_points"), db.desc("season_points"), User.display_name.asc())
         .all()
     )
     return rows
 
 
-def tournament_standings():
-    """List of (user, points) cumulative across COMPLETE rounds, highest first."""
+def season_standings():
+    """List of (user, points) cumulative across COMPLETE gameweeks, highest first."""
     pts = (
         db.session.query(
             Prediction.user_id.label("user_id"),
             func.coalesce(func.sum(Prediction.points), 0).label("points"),
         )
         .join(Fixture, Fixture.id == Prediction.fixture_id)
-        .join(Round, Round.id == Fixture.round_id)
-        .filter(Round.status == "COMPLETE")
+        .join(Gameweek, Gameweek.id == Fixture.gameweek_id)
+        .filter(Gameweek.status == "COMPLETE")
         .group_by(Prediction.user_id)
         .subquery()
     )

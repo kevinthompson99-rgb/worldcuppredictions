@@ -4,7 +4,7 @@
     through (assumed match length + 30 minutes) after the day's latest kick-off -
     poll the API every 30 seconds for that day's matches only.
   - Outside live windows, run one lightweight full sync per day at 06:00 UTC to
-    pick up fixture changes and newly confirmed knockout matchups.
+    pick up fixture changes (rearranged/postponed matches).
 
 Implemented with APScheduler's BackgroundScheduler running inside the Flask process:
 one job ticks every 30 seconds and only does work if "now" falls in today's live
@@ -95,8 +95,8 @@ def _record_poll(mode, summary=None, error=None):
         log.fixtures_scored = summary["scored_fixtures"]
         if summary["flagged_for_review"]:
             log.detail = (
-                "Went to extra time/penalties - verify 90-minute score: "
-                f"fixture id(s) {summary['flagged_for_review']}"
+                "Rearranged fixture(s) - matchday changed after their gameweek was "
+                f"published: fixture id(s) {summary['flagged_for_review']}"
             )
     db.session.add(log)
     db.session.commit()

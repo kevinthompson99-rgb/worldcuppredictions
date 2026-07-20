@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Manage gameweeks{% endblock %}
+{% block content %}
+{% include "admin/_mobile.html" %}
+<div class="admin-page">
+  <h1 class="mb-4">Gameweeks</h1>
+  <p class="text-muted small">
+    Auto-created from football-data.org's matchday number as fixtures sync in &mdash;
+    publish each one when it's ready to open for predictions.
+  </p>
+
+  <ul class="admin-list">
+    {% for gameweek in gameweeks %}
+    <li class="admin-row">
+      <div class="admin-row-head">
+        <span>GW{{ gameweek.matchday }} &middot; {{ gameweek.name }}</span>
+        {% if gameweek.status == 'DRAFT' %}<span class="badge bg-secondary">Draft</span>
+        {% elif gameweek.status == 'ACTIVE' %}
+          {% if gameweek.is_locked %}<span class="badge bg-info text-dark">Active &mdash; locked</span>
+          {% else %}<span class="badge bg-success">Active &mdash; open</span>
+          {% endif %}
+        {% else %}<span class="badge bg-dark">Complete</span>
+        {% endif %}
+      </div>
+      <div class="admin-row-meta">
+        <span>{{ gameweek.fixtures.count() }} fixture{{ '' if gameweek.fixtures.count() == 1 else 's' }}</span>
+        <span>Stake {{ gameweek.stake_amount | gbp }}</span>
+        <span>Locks {{ gameweek.lock_time | london('%a %d %b, %H:%M %Z') if gameweek.lock_time else '—' }}</span>
+      </div>
+      <div class="admin-row-actions">
+        <a href="{{ url_for('admin.gameweek_detail', gameweek_id=gameweek.id) }}" class="btn btn-sm btn-outline-primary">Manage</a>
+      </div>
+    </li>
+    {% else %}
+    <li class="admin-empty">No gameweeks yet &mdash; sync fixtures from the admin dashboard to populate the season.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

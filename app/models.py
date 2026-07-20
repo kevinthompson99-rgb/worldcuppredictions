@@ -6,24 +6,28 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
 
-# Match outcome constants used for both `Fixture.winner` and result comparisons.
+# Match outcome constants used for both `Fixture.result_outcome` and prediction comparisons.
 OUTCOME_HOME = "HOME"
 OUTCOME_AWAY = "AWAY"
 OUTCOME_DRAW = "DRAW"
 
-# Round lifecycle - admin-curated, see app/round_helpers.py and the admin blueprint's
-# create/publish/complete actions for the rules around each transition.
-#   DRAFT    - admin is preparing it (naming it, assigning fixtures); invisible to users.
-#   ACTIVE   - the one round currently open to/visible by users; predictions + live results.
+# Gameweek lifecycle - fixtures/gameweeks are auto-populated from the football-data.org API
+# (see app/sync.py), but the admin still explicitly controls visibility via this status, see
+# app/gameweek_helpers.py and the admin blueprint's publish/complete actions.
+#   DRAFT    - auto-created as fixtures sync in; invisible to users. Most of the season's
+#              38 gameweeks legitimately sit here at any given time (no cap - the admin
+#              publishes each one when ready, not all at once).
+#   ACTIVE   - the one gameweek currently open to/visible by users; predictions + live results.
 #   COMPLETE - locked, settled, and archived for reference (leaderboards/history).
-ROUND_STATUS_DRAFT = "DRAFT"
-ROUND_STATUS_ACTIVE = "ACTIVE"
-ROUND_STATUS_COMPLETE = "COMPLETE"
-ROUND_STATUSES = (ROUND_STATUS_DRAFT, ROUND_STATUS_ACTIVE, ROUND_STATUS_COMPLETE)
+GAMEWEEK_STATUS_DRAFT = "DRAFT"
+GAMEWEEK_STATUS_ACTIVE = "ACTIVE"
+GAMEWEEK_STATUS_COMPLETE = "COMPLETE"
+GAMEWEEK_STATUSES = (GAMEWEEK_STATUS_DRAFT, GAMEWEEK_STATUS_ACTIVE, GAMEWEEK_STATUS_COMPLETE)
 
 PREDICTION_LOCK_MINUTES_BEFORE_KICKOFF = 5
 
-# Used as the round's stake when the admin doesn't set one explicitly when creating it.
+# Used as a gameweek's stake when sync auto-creates it - admin can override via
+# admin.set_gameweek_stake.
 DEFAULT_STAKE_AMOUNT = Decimal("5.00")
 
 
@@ -45,8 +49,8 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     # cascade="all, delete-orphan": deleting a user (admin.delete_user) must take
-    # their predictions and round entries (opt-ins included - opted_in lives on
-    # RoundEntry) with them, or the delete fails on the FK / leaves orphans that
+    # their predictions and gameweek entries (opt-ins included - opted_in lives on
+    # GameweekEntry) with them, or the delete fails on the FK / leaves orphans that
     # keep them showing up in the players grid and standings.
     predictions = db.relationship("Prediction", back_populates="user", lazy="dynamic", cascade="all, delete-orphan")
 
@@ -61,28 +65,28 @@ class User(UserMixin, db.Model):
         return f"<User {self.username}>"
 
 
-class Round(db.Model):
-    __tablename__ = "rounds"
+class Gameweek(db.Model):
+    __tablename__ = "gameweeks"
 
     id = db.Column(db.Integer, primary_key=True)
+    # football-data.org's own matchday number (1-38) - the season's fixture list is known
+    # entirely upfront, so this (not an admin-assigned sequence) is the natural ordering key
+    # and sync.py get-or-creates a Gameweek per distinct matchday it sees.
+    matchday = db.Column(db.Integer, unique=True, nullable=False, index=True)
+    # Auto-derived as "Gameweek {matchday}" when sync creates the row.
     name = db.Column(db.String(120), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    # Determines display/processing order, e.g. 1 = Group Stage Week 1 ... 8 = Final.
-    # Auto-assigned as (previous round's sequence + 1) when a draft is created - rounds
-    # are always prepared and played in order, even if drafted ahead of time.
-    sequence = db.Column(db.Integer, unique=True, nullable=False)
-    # Per-round buy-in - sized for GBP to the penny. Set by the admin when creating the
-    # round (see admin.create_round); defaults to DEFAULT_STAKE_AMOUNT when left blank.
+    # Per-gameweek buy-in - sized for GBP to the penny. Defaults to DEFAULT_STAKE_AMOUNT when
+    # sync auto-creates the gameweek; admin can override any time via admin.set_gameweek_stake.
     stake_amount = db.Column(db.Numeric(8, 2), nullable=False, default=DEFAULT_STAKE_AMOUNT)
-    status = db.Column(db.String(16), nullable=False, default=ROUND_STATUS_DRAFT, index=True)
+    status = db.Column(db.String(16), nullable=False, default=GAMEWEEK_STATUS_DRAFT, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    # Dev/testing escape hatch: lets an admin lock a round on demand, bypassing the
-    # kick-off-based lock_time below. See admin.force_lock_round.
+    # Dev/testing escape hatch: lets an admin lock a gameweek on demand, bypassing the
+    # kick-off-based lock_time below. See admin.force_lock_gameweek.
     force_locked = db.Column(db.Boolean, nullable=False, default=False)
 
     fixtures = db.relationship(
         "Fixture",
-        back_populates="round",
+        back_populates="gameweek",
         order_by="Fixture.kickoff_at",
         lazy="dynamic",
     )
@@ -102,7 +106,7 @@ class Round(db.Model):
 
     @property
     def lock_time(self):
-        """Predictions for the round lock 5 minutes before its earliest kick-off."""
+        """Predictions for the gameweek lock 5 minutes before its earliest kick-off."""
         earliest = self.earliest_kickoff
         if earliest is None:
             return None
@@ -120,14 +124,14 @@ class Round(db.Model):
         """Locked, with fixtures assigned, and every one of them finished and scored.
 
         This is a computed *readiness* check, distinct from `status == COMPLETE` (which
-        is an explicit admin decision to archive the round - see admin.complete_round).
-        It's used to inform the admin when a round looks ready to be marked complete.
+        is an explicit admin decision to archive the gameweek - see admin.complete_gameweek).
+        It's used to inform the admin when a gameweek looks ready to be marked complete.
         """
         fixtures = self.fixtures.all()
         return bool(fixtures) and self.is_locked and all(f.is_finished for f in fixtures)
 
     def __repr__(self):
-        return f"<Round {self.sequence}: {self.name} [{self.status}]>"
+        return f"<Gameweek {self.matchday}: {self.name} [{self.status}]>"
 
 
 class Fixture(db.Model):
@@ -137,41 +141,34 @@ class Fixture(db.Model):
     # football-data.org match id - lets us reconcile synced fixtures/results.
     external_id = db.Column(db.Integer, unique=True, nullable=True, index=True)
 
-    round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=True, index=True)
-    round = db.relationship("Round", back_populates="fixtures")
+    gameweek_id = db.Column(db.Integer, db.ForeignKey("gameweeks.id"), nullable=True, index=True)
+    gameweek = db.relationship("Gameweek", back_populates="fixtures")
 
     home_team = db.Column(db.String(120), nullable=False)
     away_team = db.Column(db.String(120), nullable=False)
     home_short_name = db.Column(db.String(80), nullable=True)
     away_short_name = db.Column(db.String(80), nullable=True)
 
-    # Free-text descriptors from the API, e.g. stage="GROUP_STAGE", group="Group A".
-    stage = db.Column(db.String(64), nullable=True)
-    group_name = db.Column(db.String(64), nullable=True)
+    # Club crest image URLs, straight from the API's match payload - no separate teams
+    # lookup/model needed.
+    home_crest_url = db.Column(db.String(255), nullable=True)
+    away_crest_url = db.Column(db.String(255), nullable=True)
 
     kickoff_at = db.Column(db.DateTime, nullable=False, index=True)
-
-    # Knockout matches score against the 90-minute result only; group matches
-    # never go to extra time so this flag simplifies the scoring branch.
-    is_knockout = db.Column(db.Boolean, nullable=False, default=False)
 
     # football-data.org status, e.g. SCHEDULED / TIMED / IN_PLAY / PAUSED / FINISHED / POSTPONED.
     status = db.Column(db.String(32), nullable=False, default="SCHEDULED")
 
-    # Score after 90 minutes of regulation - this is what predictions are scored against,
-    # even for knockout matches that go on to extra time / penalties.
-    home_score_90 = db.Column(db.Integer, nullable=True)
-    away_score_90 = db.Column(db.Integer, nullable=True)
+    # Full-time score - what predictions are scored against. League matches are always
+    # decided at 90 minutes (plus stoppage time), so there's no separate "90-minute vs.
+    # extra-time" distinction to track here.
+    home_score = db.Column(db.Integer, nullable=True)
+    away_score = db.Column(db.Integer, nullable=True)
 
     # Live match clock from the API ("minute"/"injuryTime"), only meaningful while
     # status is one of _LIVE_MINUTE_STATUSES - see minute_display.
     current_minute = db.Column(db.Integer, nullable=True)
     current_injury_time = db.Column(db.Integer, nullable=True)
-
-    # Final outcome of the match (after ET/penalties if applicable). Always HOME or AWAY
-    # for knockout fixtures - "correct result" there means picking the side that advances,
-    # regardless of the 90-minute scoreline. DRAW is only possible in group-stage matches.
-    winner = db.Column(db.String(8), nullable=True)
 
     last_synced_at = db.Column(db.DateTime, nullable=True)
     manually_corrected = db.Column(db.Boolean, nullable=False, default=False)
@@ -186,7 +183,7 @@ class Fixture(db.Model):
 
     @property
     def is_finished(self):
-        """FINISHED or AWARDED - the result is final and "FT" is shown for the rest of the round."""
+        """FINISHED or AWARDED - the result is final and "FT" is shown for the rest of the gameweek."""
         return self.status in self._FINISHED_STATUSES
 
     @property
@@ -210,12 +207,12 @@ class Fixture(db.Model):
 
     @property
     def result_outcome(self):
-        """HOME/AWAY/DRAW based on the current/90-minute score - used for scoring."""
-        if self.home_score_90 is None or self.away_score_90 is None:
+        """HOME/AWAY/DRAW based on the current/full-time score - used for scoring."""
+        if self.home_score is None or self.away_score is None:
             return None
-        if self.home_score_90 > self.away_score_90:
+        if self.home_score > self.away_score:
             return OUTCOME_HOME
-        if self.away_score_90 > self.home_score_90:
+        if self.away_score > self.home_score:
             return OUTCOME_AWAY
         return OUTCOME_DRAW
 
@@ -223,8 +220,8 @@ class Fixture(db.Model):
         return f"<Fixture {self.home_team} v {self.away_team} @ {self.kickoff_at}>"
 
 
-class RoundEntry(db.Model):
-    """A user's opt-in/out decision for a round's £5 pot (see app/finance.py).
+class GameweekEntry(db.Model):
+    """A user's opt-in/out decision for a gameweek's £5 pot (see app/finance.py).
 
     Opting in is financial only - it doesn't gate prediction *visibility*, but the app
     only lets opted-in users submit predictions and only shows opted-in users in the
@@ -232,22 +229,22 @@ class RoundEntry(db.Model):
     so `opted_in` always reflects their latest choice (allowed any time up to lock).
     """
 
-    __tablename__ = "round_entries"
+    __tablename__ = "gameweek_entries"
     __table_args__ = (
-        db.UniqueConstraint("user_id", "round_id", name="uq_round_entry_user_round"),
+        db.UniqueConstraint("user_id", "gameweek_id", name="uq_gameweek_entry_user_gameweek"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False, index=True)
+    gameweek_id = db.Column(db.Integer, db.ForeignKey("gameweeks.id"), nullable=False, index=True)
     opted_in = db.Column(db.Boolean, nullable=False, default=False)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user = db.relationship("User", backref=db.backref("round_entries", lazy="dynamic", cascade="all, delete-orphan"))
-    round = db.relationship("Round", backref=db.backref("entries", lazy="dynamic"))
+    user = db.relationship("User", backref=db.backref("gameweek_entries", lazy="dynamic", cascade="all, delete-orphan"))
+    gameweek = db.relationship("Gameweek", backref=db.backref("entries", lazy="dynamic"))
 
     def __repr__(self):
-        return f"<RoundEntry user={self.user_id} round={self.round_id} opted_in={self.opted_in}>"
+        return f"<GameweekEntry user={self.user_id} gameweek={self.gameweek_id} opted_in={self.opted_in}>"
 
 
 class Prediction(db.Model):
@@ -291,13 +288,14 @@ class PollLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     run_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
-    # "live" (3-minute polling during a match window), "daily" (06:00 UTC sync), or "manual" (admin-triggered).
+    # "live" (30-second polling during a match window), "daily" (06:00 UTC sync), or "manual" (admin-triggered).
     mode = db.Column(db.String(16), nullable=False)
     succeeded = db.Column(db.Boolean, nullable=False, default=True)
     fixtures_created = db.Column(db.Integer, nullable=False, default=0)
     fixtures_updated = db.Column(db.Integer, nullable=False, default=0)
     fixtures_scored = db.Column(db.Integer, nullable=False, default=0)
-    # Error message on failure, or notes such as fixtures flagged for manual ET/penalty review.
+    # Error message on failure, or notes such as fixtures flagged because the API reported a
+    # different matchday than the one they're currently (already published) assigned to.
     detail = db.Column(db.Text, nullable=True)
 
     def __repr__(self):

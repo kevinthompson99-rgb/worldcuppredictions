@@ -1,63 +1,76 @@
-"""Per-round financial tracking: opt-in stakes, pot sizes, and settlement.
+"""Per-gameweek financial tracking: opt-in stakes, pot sizes, and settlement.
 
-Players opt in to a round (see RoundEntry) to enter that week's GBP 5 pot. Once every
-fixture in the round is finished and scored, the highest-scoring opted-in player(s)
-split the pot and everyone else opted-in loses their stake (see `round_financial_summary`
+Players opt in to a gameweek (see GameweekEntry) to enter that week's GBP pot. Once every
+fixture in the gameweek is finished and scored, the highest-scoring opted-in player(s)
+split the pot and everyone else opted-in loses their stake (see `gameweek_financial_summary`
 for the exact arithmetic). Nothing here is persisted - it's all derived on the fly from
-RoundEntry + Prediction.points, so a later score correction can't leave stale figures
+GameweekEntry + Prediction.points, so a later score correction can't leave stale figures
 behind. No real money moves; this is for reference, settled externally between players.
 """
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
-from app.leaderboards import round_leaderboard, tournament_standings
-from app.models import DEFAULT_STAKE_AMOUNT, Round, RoundEntry
+from app.extensions import db
+from app.leaderboards import gameweek_leaderboard, season_standings
+from app.models import DEFAULT_STAKE_AMOUNT, Gameweek, GameweekEntry
 
 
-def opted_in_user_ids(round_):
-    """Set of user ids who are currently opted in to `round_`'s pot."""
+def opted_in_user_ids(gameweek):
+    """Set of user ids who are currently opted in to `gameweek`'s pot."""
     return {
         entry.user_id
-        for entry in RoundEntry.query.filter_by(round_id=round_.id, opted_in=True)
+        for entry in GameweekEntry.query.filter_by(gameweek_id=gameweek.id, opted_in=True)
     }
 
 
-def is_opted_in(user, round_):
-    entry = RoundEntry.query.filter_by(user_id=user.id, round_id=round_.id).first()
+def is_opted_in(user, gameweek):
+    entry = GameweekEntry.query.filter_by(user_id=user.id, gameweek_id=gameweek.id).first()
     return bool(entry and entry.opted_in)
 
 
-def round_pot(entrant_count, stake=DEFAULT_STAKE_AMOUNT):
+def gameweek_pot(entrant_count, stake=DEFAULT_STAKE_AMOUNT):
     return stake * entrant_count
+
+
+def set_gameweek_stake(gameweek, amount):
+    """Parse/validate and set a gameweek's stake. Raises ValueError on an invalid amount."""
+    try:
+        parsed = Decimal(amount)
+    except (InvalidOperation, TypeError):
+        raise ValueError("Enter a valid amount.")
+    if parsed <= 0:
+        raise ValueError("Stake must be greater than zero.")
+    gameweek.stake_amount = parsed.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    db.session.commit()
 
 
 def _split_pot(pot, num_winners):
     return (pot / num_winners).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def round_financial_summary(round_):
-    """Pot/settlement details for a round.
+def gameweek_financial_summary(gameweek):
+    """Pot/settlement details for a gameweek.
 
     Returns {
         "pot": Decimal, "stake": Decimal, "entrant_count": int, "settled": bool,
-        "rows": [{"user", "round_points", "financial_result", "is_winner"}, ...],
+        "rows": [{"user", "gameweek_points", "financial_result", "is_winner"}, ...],
     }
 
-    `rows` covers opted-in users only, ranked by round points (highest first).
-    `financial_result` is `None` until the round is settled (every fixture finished
+    `rows` covers opted-in users only, ranked by gameweek points (highest first).
+    `financial_result` is `None` until the gameweek is settled (every fixture finished
     and scored) - the winner can't be determined, and therefore no one has won or
     lost anything yet, before that. Once settled: the winner(s) net `pot/n - stake`
     (their winnings minus the stake they put in) and everyone else nets `-stake` -
     these always sum to zero across the entrant pool.
     """
-    stake = round_.stake_amount
-    entrant_ids = opted_in_user_ids(round_)
-    pot = round_pot(len(entrant_ids), stake)
-    settled = round_.all_fixtures_settled
+    stake = gameweek.stake_amount
+    entrant_ids = opted_in_user_ids(gameweek)
+    pot = gameweek_pot(len(entrant_ids), stake)
+    settled = gameweek.all_fixtures_settled
 
     rows = []
     if entrant_ids:
-        ranked = [(user, points) for user, points, _ in round_leaderboard(round_) if user.id in entrant_ids]
+        ranked = [(user, points) for user, points, _ in gameweek_leaderboard(gameweek) if user.id in entrant_ids]
 
         winner_ids = set()
         share = None
@@ -77,7 +90,7 @@ def round_financial_summary(round_):
 
             rows.append({
                 "user": user,
-                "round_points": points,
+                "gameweek_points": points,
                 "financial_result": financial_result,
                 "is_winner": is_winner,
             })
@@ -92,16 +105,16 @@ def round_financial_summary(round_):
 
 
 def season_financial_table():
-    """Cumulative points + balance for every user who has opted in to at least one round.
+    """Cumulative points + balance for every user who has opted in to at least one gameweek.
 
-    Ordered by cumulative tournament points (highest first). Balances only include
-    settled rounds - a round still in progress doesn't move anyone's total yet.
+    Ordered by cumulative season points (highest first). Balances only include settled
+    gameweeks - a gameweek still in progress doesn't move anyone's total yet.
     """
     participated = set()
     balances = {}
 
-    for round_ in Round.query.order_by(Round.sequence.asc()).all():
-        summary = round_financial_summary(round_)
+    for gameweek in Gameweek.query.order_by(Gameweek.matchday.asc()).all():
+        summary = gameweek_financial_summary(gameweek)
         for row in summary["rows"]:
             user_id = row["user"].id
             participated.add(user_id)
@@ -110,14 +123,14 @@ def season_financial_table():
 
     return [
         (user, points, balances.get(user.id, Decimal("0")))
-        for user, points in tournament_standings()
+        for user, points in season_standings()
         if user.id in participated
     ]
 
 
-def all_rounds_financial_summary():
-    """Per-round financial summaries for every round, newest first - the admin's view."""
+def all_gameweeks_financial_summary():
+    """Per-gameweek financial summaries for every gameweek, newest first - the admin's view."""
     return [
-        (round_, round_financial_summary(round_))
-        for round_ in Round.query.order_by(Round.sequence.desc()).all()
+        (gameweek, gameweek_financial_summary(gameweek))
+        for gameweek in Gameweek.query.order_by(Gameweek.matchday.desc()).all()
     ]

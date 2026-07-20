@@ -6,56 +6,47 @@
 <h1 class="mb-4">Admin</h1>
 
 <div class="row g-2 g-md-3 mb-4">
-  <div class="col-6 col-md-3"><div class="card text-center"><div class="card-body py-2 py-md-3"><h2 class="mb-0">{{ round_count }}</h2><p class="text-muted mb-0 small">Rounds</p></div></div></div>
+  <div class="col-6 col-md-3"><div class="card text-center"><div class="card-body py-2 py-md-3"><h2 class="mb-0">{{ gameweek_count }}</h2><p class="text-muted mb-0 small">Gameweeks</p></div></div></div>
   <div class="col-6 col-md-3"><div class="card text-center"><div class="card-body py-2 py-md-3"><h2 class="mb-0">{{ fixture_count }}</h2><p class="text-muted mb-0 small">Fixtures ({{ unassigned_count }} unassigned)</p></div></div></div>
   <div class="col-6 col-md-3"><div class="card text-center"><div class="card-body py-2 py-md-3"><h2 class="mb-0">{{ user_count }}</h2><p class="text-muted mb-0 small">Users</p></div></div></div>
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-md-4">
+  <div class="col-md-6">
     <div class="card h-100">
       <div class="card-body">
-        <h5 class="card-title">Active round</h5>
-        {% if active_round %}
-          <p class="card-text mb-1"><strong>{{ active_round.name }}</strong> <span class="badge bg-success">ACTIVE</span></p>
+        <h5 class="card-title">Active gameweek</h5>
+        {% if active_gameweek %}
+          <p class="card-text mb-1"><strong>{{ active_gameweek.name }}</strong> <span class="badge bg-success">ACTIVE</span></p>
           <p class="card-text text-muted mb-2">
-            {{ active_round.fixtures.count() }} fixture(s) &middot;
-            {% if active_round.is_locked %}locked, results coming in{% else %}locks at {{ active_round.lock_time | london('%a %d %b, %H:%M %Z') }}{% endif %}
+            {{ active_gameweek.fixtures.count() }} fixture(s) &middot;
+            {% if active_gameweek.is_locked %}locked, results coming in{% else %}locks at {{ active_gameweek.lock_time | london('%a %d %b, %H:%M %Z') }}{% endif %}
           </p>
-          <a href="{{ url_for('admin.round_detail', round_id=active_round.id) }}" class="btn btn-sm btn-outline-primary">Manage &raquo;</a>
+          <a href="{{ url_for('admin.gameweek_detail', gameweek_id=active_gameweek.id) }}" class="btn btn-sm btn-outline-primary">Manage &raquo;</a>
         {% else %}
-          <p class="card-text text-muted mb-0">No round is currently active.</p>
+          <p class="card-text text-muted mb-0">No gameweek is currently active.</p>
         {% endif %}
       </div>
     </div>
   </div>
-  {% for draft in draft_rounds %}
-  <div class="col-md-4">
+  <div class="col-md-6">
     <div class="card h-100">
       <div class="card-body">
-        <h5 class="card-title">Draft round{% if draft_rounds|length > 1 %} {{ loop.index }}{% endif %}</h5>
-        <p class="card-text mb-1"><strong>{{ draft.name }}</strong> <span class="badge bg-secondary">DRAFT</span></p>
-        <p class="card-text text-muted mb-2">{{ draft.fixtures.count() }} fixture(s) assigned &mdash; not yet visible to users.</p>
-        <a href="{{ url_for('admin.round_detail', round_id=draft.id) }}" class="btn btn-sm btn-outline-primary">Prepare &raquo;</a>
+        <h5 class="card-title">Draft gameweeks</h5>
+        {% if next_draft_gameweek %}
+          <p class="card-text mb-1">{{ draft_count }} gameweek{{ '' if draft_count == 1 else 's' }} in draft, auto-populated as fixtures sync in.</p>
+          <p class="card-text text-muted mb-2">Next up: <strong>{{ next_draft_gameweek.name }}</strong></p>
+          <a href="{{ url_for('admin.gameweeks') }}" class="btn btn-sm btn-outline-primary">View all gameweeks &raquo;</a>
+        {% else %}
+          <p class="card-text text-muted mb-0">No draft gameweeks yet &mdash; sync fixtures to populate the season.</p>
+        {% endif %}
       </div>
     </div>
   </div>
-  {% else %}
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-body">
-        <h5 class="card-title">Draft round</h5>
-        <p class="card-text text-muted mb-0">No draft round being prepared.
-          <a href="{{ url_for('admin.rounds') }}">Create one &raquo;</a>
-        </p>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
-  <a href="{{ url_for('admin.rounds') }}" class="btn btn-sm btn-primary">Manage rounds</a>
+  <a href="{{ url_for('admin.gameweeks') }}" class="btn btn-sm btn-primary">Manage gameweeks</a>
   <a href="{{ url_for('admin.fixtures') }}" class="btn btn-sm btn-outline-secondary">All fixtures</a>
   <a href="{{ url_for('admin.users') }}" class="btn btn-sm btn-outline-secondary">Users</a>
   <a href="{{ url_for('admin.polling') }}" class="btn btn-sm btn-outline-secondary">Polling activity</a>
@@ -89,9 +80,9 @@
 </div>
 
 <p class="text-muted">
-  Fixture sync pulls matches from football-data.org. New fixtures arrive unassigned -
-  use "Manage rounds" to curate which matches belong to each round (essential for the
-  knockout stage, where matchups are only known once earlier rounds finish).
+  Fixture sync pulls matches from football-data.org and auto-creates/populates each
+  gameweek from the API's own matchday number &mdash; use "Manage gameweeks" to publish
+  each one when it's ready, or to review any fixtures flagged after a rearrangement.
 </p>
 </div>
 {% endblock %}

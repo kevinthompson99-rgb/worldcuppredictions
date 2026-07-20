@@ -4,8 +4,8 @@
 {% block content %}
 <div class="about-page">
   <div class="about-card">
-    <div class="about-name">LEBIM</div>
-    <p class="about-desc">Football Predictions</p>
+    <div class="about-name">LEPREM</div>
+    <p class="about-desc">Premier League Predictions</p>
     <p class="about-version">Version {{ app_version }}</p>
     <a class="about-back" href="{{ url_for('main.index') }}">&larr; Back to home</a>
   </div>
@@ -13,7 +13,7 @@
 
 <style>
   body.about-body {
-    background: #121417;
+    background: var(--bg);
   }
   .about-page {
     color: #e9ecef;
@@ -22,8 +22,8 @@
     padding-top: 3rem;
   }
   .about-card {
-    background: #1f242b;
-    border: 1px solid #2a2f36;
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: 0.6rem;
     padding: 2rem;
     text-align: center;
@@ -34,11 +34,11 @@
     font-weight: 800;
     letter-spacing: 0.06em;
     font-size: 1.6rem;
-    color: #ffd166;
+    color: var(--accent);
   }
   .about-desc {
     margin: 0.5rem 0 0;
-    color: #9aa3ad;
+    color: var(--text-muted);
     font-size: 0.95rem;
   }
   .about-version {
@@ -49,7 +49,7 @@
   .about-back {
     display: inline-block;
     margin-top: 1.5rem;
-    color: #ffd166;
+    color: var(--accent);
     text-decoration: none;
     font-size: 0.9rem;
     font-weight: 600;

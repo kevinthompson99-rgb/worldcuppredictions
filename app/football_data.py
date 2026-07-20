@@ -17,13 +17,18 @@ def _headers():
     }
 
 
-def get_world_cup_matches(date_from=None, date_to=None):
-    """Fetch matches for the World Cup competition, optionally filtered by date (YYYY-MM-DD)."""
+def get_premier_league_matches(season=None, date_from=None, date_to=None):
+    """Fetch Premier League matches, optionally filtered by date (YYYY-MM-DD).
+
+    `season` pins the fixture list to a specific season's year (e.g. 2026 for 2026/27) -
+    always passed explicitly (defaulting to config's PL_SEASON_YEAR) rather than relying on
+    the API's own "current season" default, since this app runs across an entire season.
+    """
     base = current_app.config["FOOTBALL_DATA_BASE_URL"]
-    code = current_app.config["WORLD_CUP_COMPETITION_CODE"]
+    code = current_app.config["PREMIER_LEAGUE_COMPETITION_CODE"]
     url = f"{base}/competitions/{code}/matches"
 
-    params = {}
+    params = {"season": season or current_app.config["PL_SEASON_YEAR"]}
     if date_from:
         params["dateFrom"] = date_from
     if date_to:
