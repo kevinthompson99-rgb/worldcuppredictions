@@ -455,8 +455,24 @@ var matchCountdown = (function () {
       fixCells[i].style.height = '';
       bodyRows[i].style.height = '';
     }
+
+    // Stretch rows to fill the available height (device/safe-area-agnostic - this
+    // measures the real laid-out space rather than assuming a screen size), so the
+    // standard 10-fixture gameweek reaches the bottom of the screen with no gap and
+    // no scroll, on any device. Never shrinks below each row's natural content height
+    // (falls back to scrolling if there are ever too many fixtures to fit), and caps
+    // growth at 2.5x natural so a sparsely-populated gameweek (e.g. most fixtures
+    // postponed) doesn't stretch rows to a silly height.
+    var naturalRowHeight = 0;
     for (i = 0; i < n; i++) {
-      var rh = Math.max(fixCells[i].offsetHeight, bodyRows[i].offsetHeight);
+      naturalRowHeight = Math.max(naturalRowHeight, fixCells[i].offsetHeight, bodyRows[i].offsetHeight);
+    }
+    var rh = naturalRowHeight;
+    if (n > 0 && naturalRowHeight > 0) {
+      var idealRowHeight = leftWrap.clientHeight / n;
+      rh = Math.min(Math.max(idealRowHeight, naturalRowHeight), naturalRowHeight * 2.5);
+    }
+    for (i = 0; i < n; i++) {
       fixCells[i].style.height = rh + 'px';
       bodyRows[i].style.height = rh + 'px';
     }
@@ -839,7 +855,7 @@ var matchCountdown = (function () {
     flex-shrink: 0;
     box-sizing: border-box;
     width: var(--pgrid-fix-w);
-    padding: 0.658rem 0.6rem;
+    padding: 0.45rem 0.6rem;
     border-bottom: 1px solid var(--border-alt);
     border-right: 1px solid var(--border-alt);
     background: var(--panel);
@@ -943,7 +959,7 @@ var matchCountdown = (function () {
     flex-shrink: 0;
     width: var(--pgrid-col-w);
     box-sizing: border-box;
-    padding: 0.658rem 0.4rem;
+    padding: 0.45rem 0.4rem;
     border-bottom: 1px solid var(--border-alt);
     border-right: 1px solid var(--border-alt);
     background: #181b20;
