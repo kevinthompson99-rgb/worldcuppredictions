@@ -22,7 +22,7 @@
         {% for fixture in fixtures %}
         {% set pred = predictions.get(fixture.id) %}
         <tr>
-          <td>{{ fixture.home_team }} v {{ fixture.away_team }}</td>
+          <td>{{ fixture.home_short_name or fixture.home_team }} v {{ fixture.away_short_name or fixture.away_team }}</td>
           <td class="text-muted small">{{ fixture.kickoff_at.strftime('%a %d %b, %H:%M') }}</td>
           <td class="text-center" style="width:80px">
             <input type="number" name="home_{{ fixture.id }}" class="form-control form-control-sm text-center"

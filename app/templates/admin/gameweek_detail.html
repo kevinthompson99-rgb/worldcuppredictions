@@ -29,13 +29,13 @@
       <p class="mb-2">
         Stake: <strong>{{ gameweek.stake_amount | gbp }}</strong>
       </p>
-      <form method="post" action="{{ url_for('admin.set_stake', gameweek_id=gameweek.id) }}" class="d-flex gap-2 align-items-center mb-3" style="max-width: 14rem;">
+      <form method="post" action="{{ url_for('admin.set_stake', gameweek_id=gameweek.id) }}" class="d-flex gap-2 align-items-center flex-wrap mb-3">
         {{ form.hidden_tag() }}
-        <div class="input-group input-group-sm">
+        <div class="input-group input-group-sm" style="width: auto; max-width: 9rem;">
           <span class="input-group-text">£</span>
-          <input type="text" inputmode="decimal" name="stake_amount" class="form-control" placeholder="{{ gameweek.stake_amount }}">
+          <input type="text" inputmode="decimal" name="stake_amount" class="form-control" style="width: 4.5rem;" placeholder="{{ gameweek.stake_amount }}">
         </div>
-        <button type="submit" class="btn btn-sm btn-outline-secondary">Set</button>
+        <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0">Set</button>
       </form>
 
       {% if gameweek.status == 'DRAFT' %}
@@ -74,7 +74,7 @@
     {% for fixture in fixtures %}
     <li class="admin-row">
       <div class="admin-row-head">
-        <span><img src="{{ fixture.home_crest_url }}" alt="" class="admin-crest"> {{ fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="admin-crest"></span>
+        <span><img src="{{ fixture.home_crest_url }}" alt="" class="admin-crest"> {{ fixture.home_short_name or fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_short_name or fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="admin-crest"></span>
       </div>
       <div class="admin-row-meta">
         <span>{{ fixture.kickoff_at | london('%a %d %b %Y, %H:%M %Z') }}</span>
@@ -106,7 +106,7 @@
           <input type="checkbox" class="form-check-input mt-1 flex-shrink-0" name="fixture_ids" value="{{ fixture.id }}">
           <span>
             <span class="admin-row-head">
-              <img src="{{ fixture.home_crest_url }}" alt="" class="admin-crest"> {{ fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="admin-crest">
+              <img src="{{ fixture.home_crest_url }}" alt="" class="admin-crest"> {{ fixture.home_short_name or fixture.home_team }} <span class="text-muted fw-normal">v</span> {{ fixture.away_short_name or fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="admin-crest">
             </span>
             <span class="admin-row-meta">
               <span>{{ fixture.kickoff_at | london('%a %d %b %Y, %H:%M %Z') }}</span>

@@ -9,6 +9,12 @@
     data-quality tool for the rare case a sync ran mid-VAR-review, or before a postponed
     match's re-fixture synced correctly.
   </p>
+  {% if show_all %}
+    <p><a href="{{ url_for('admin.fixtures') }}">&larr; Hide completed gameweeks</a></p>
+  {% else %}
+    <p class="text-muted small">Fixtures from completed gameweeks are hidden by default.
+      <a href="{{ url_for('admin.fixtures', all=1) }}">Show everything &raquo;</a></p>
+  {% endif %}
 
   <ul class="admin-list">
     {% for fixture in fixtures %}

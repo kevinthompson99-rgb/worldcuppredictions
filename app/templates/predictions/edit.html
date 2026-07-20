@@ -39,9 +39,9 @@
         {% for fixture in fixtures %}
           <li class="fixture-row">
             <div class="fixture-teams">
-              <img src="{{ fixture.home_crest_url }}" alt="" class="team-crest"> {{ fixture.home_team }}
+              <img src="{{ fixture.home_crest_url }}" alt="" class="team-crest"> {{ fixture.home_short_name or fixture.home_team }}
               <span class="vs">v</span>
-              {{ fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="team-crest">
+              {{ fixture.away_short_name or fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="team-crest">
             </div>
             <div class="fixture-score-entry">
               {{ form["home_" ~ fixture.id](class_="score-input") }}

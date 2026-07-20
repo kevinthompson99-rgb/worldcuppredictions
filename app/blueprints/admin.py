@@ -297,9 +297,22 @@ def unassign_fixture(fixture_id):
 
 @bp.route("/fixtures")
 def fixtures():
+    """All fixtures, for score correction. Defaults to hiding fixtures whose gameweek is
+    already COMPLETE - with the full season synced upfront, this list would otherwise
+    only ever grow (380 fixtures/season) and bury the current/recent ones that actually
+    need attention. ?all=1 shows the complete unfiltered list for the rare case an old
+    result needs correcting.
+    """
+    show_all = request.args.get("all") == "1"
+    query = Fixture.query
+    if not show_all:
+        query = query.filter(
+            db.or_(Fixture.gameweek_id.is_(None), Fixture.gameweek.has(Gameweek.status != GAMEWEEK_STATUS_COMPLETE))
+        )
     return render_template(
         "admin/fixtures.html",
-        fixtures=Fixture.query.order_by(Fixture.kickoff_at.asc()).all(),
+        fixtures=query.order_by(Fixture.kickoff_at.asc()).all(),
+        show_all=show_all,
         form=CSRFForm(),
     )
 

@@ -12,7 +12,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from app.extensions import db
 from app.leaderboards import gameweek_leaderboard, season_standings
-from app.models import DEFAULT_STAKE_AMOUNT, Gameweek, GameweekEntry
+from app.models import DEFAULT_STAKE_AMOUNT, GAMEWEEK_STATUS_DRAFT, Gameweek, GameweekEntry
 
 
 def opted_in_user_ids(gameweek):
@@ -129,8 +129,14 @@ def season_financial_table():
 
 
 def all_gameweeks_financial_summary():
-    """Per-gameweek financial summaries for every gameweek, newest first - the admin's view."""
+    """Per-gameweek financial summaries for every published gameweek, newest first - the
+    admin's view. DRAFT gameweeks are excluded - they've never been open for opt-in, so
+    there's nothing to settle, and with all 38 auto-created upfront, most of the season
+    sits in DRAFT at any given time - showing them here would bury the gameweeks that
+    actually have activity under dozens of untouched future ones.
+    """
     return [
         (gameweek, gameweek_financial_summary(gameweek))
-        for gameweek in Gameweek.query.order_by(Gameweek.matchday.desc()).all()
+        for gameweek in Gameweek.query.filter(Gameweek.status != GAMEWEEK_STATUS_DRAFT)
+        .order_by(Gameweek.matchday.desc()).all()
     ]
