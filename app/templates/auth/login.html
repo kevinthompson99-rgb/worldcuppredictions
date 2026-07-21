@@ -1,24 +1,278 @@
 {% extends "base.html" %}
 {% block title %}Log in{% endblock %}
+{% block body_class %}login-body{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-5">
-    <h1 class="mb-4">Log in</h1>
-    <form method="post" novalidate>
+
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="login-logo">LEPREM</span>
+      <span class="login-subtitle">Premier League Predictions</span>
+    </div>
+
+    <form method="post" novalidate id="login-form">
       {{ form.hidden_tag() }}
-      <div class="mb-3">
-        {{ form.username.label(class_="form-label") }}
-        {{ form.username(class_="form-control") }}
-        {% for error in form.username.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      <div class="login-field">
+        {{ form.username.label(class_="login-label") }}
+        {{ form.username(class_="login-input") }}
+        {% for error in form.username.errors %}<div class="login-error">{{ error }}</div>{% endfor %}
       </div>
-      <div class="mb-3">
-        {{ form.password.label(class_="form-label") }}
-        {{ form.password(class_="form-control") }}
-        {% for error in form.password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      <div class="login-field">
+        {{ form.password.label(class_="login-label") }}
+        {{ form.password(class_="login-input") }}
+        {% for error in form.password.errors %}<div class="login-error">{{ error }}</div>{% endfor %}
       </div>
-      {{ form.submit(class_="btn btn-primary") }}
-      <p class="mt-3"><a href="{{ url_for('auth.register') }}">Need an account? Sign up</a></p>
+      {{ form.submit(class_="login-submit") }}
+      <p class="login-signup"><a href="{{ url_for('auth.register') }}">Need an account? Sign up</a></p>
     </form>
   </div>
 </div>
+
+<div class="login-splash" id="login-splash" aria-hidden="true">
+  <div class="login-splash-content">
+    <span class="login-splash-logo">LEPREM</span>
+    <span class="login-splash-subtitle">Premier League Predictions</span>
+  </div>
+</div>
+
+<style>
+  /* This page replaces the site chrome with a full-bleed app screen - the navbar/
+     footer/container from base.html are hidden rather than restyled, and login-screen
+     covers the viewport itself via position:fixed so no Bootstrap grid wrapper is
+     needed here. */
+  .login-body {
+    overflow: hidden;
+    height: 100dvh;
+  }
+  .login-body nav.navbar,
+  .login-body footer {
+    display: none !important;
+  }
+  .login-body .container {
+    padding: 0;
+    margin: 0;
+    max-width: none;
+  }
+
+  /* Flash alerts (eg. "Invalid username or password") live in base.html's container,
+     which is hidden behind login-screen - pin them above it instead of losing them. */
+  .login-body .alert {
+    position: fixed;
+    top: 1.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1500;
+    width: 90%;
+    max-width: 320px;
+    text-align: center;
+    background: #2a1414;
+    border: 1px solid #4a2020;
+    color: var(--status-wrong, #ff6b6b);
+    border-radius: 0.5rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .login-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 340px;
+  }
+
+  .login-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+  .login-logo {
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    font-size: 3rem;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .login-subtitle {
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    color: var(--highlight);
+    opacity: 0.85;
+  }
+
+  .login-field {
+    margin-bottom: 1.25rem;
+  }
+  .login-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+  .login-input {
+    display: block;
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--highlight);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.9rem;
+    font-size: 1rem;
+  }
+  .login-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(63, 143, 82, 0.25);
+  }
+  .login-error {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--status-wrong);
+  }
+
+  .login-submit {
+    display: block;
+    width: 100%;
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: #0d1310;
+    font-weight: 700;
+    font-size: 1rem;
+    border-radius: 0.5rem;
+    padding: 0.85rem;
+    margin-top: 0.5rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+  .login-submit:hover,
+  .login-submit:focus {
+    background: #357a46;
+    border-color: #357a46;
+  }
+  .login-submit:disabled {
+    opacity: 0.6;
+  }
+
+  .login-signup {
+    text-align: center;
+    margin-top: 1.5rem;
+    margin-bottom: 0;
+    font-size: 0.8rem;
+  }
+  .login-signup a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .login-signup a:hover {
+    color: var(--accent);
+  }
+
+  /* Post-login splash - fades in over the login screen, holds, then fades out just
+     before navigation so the transition to the redirect target is never abrupt. */
+  .login-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  .login-splash.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .login-splash.hide {
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .login-splash-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .login-splash.show .login-splash-content {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .login-splash-logo {
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    font-size: 3rem;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .login-splash-subtitle {
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    color: var(--highlight);
+  }
+</style>
+
+<script>
+(function () {
+  var form = document.getElementById("login-form");
+  var splash = document.getElementById("login-splash");
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    var submitBtn = form.querySelector('[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    fetch(form.action || window.location.href, {
+      method: "POST",
+      body: new FormData(form),
+      credentials: "same-origin"
+    }).then(function (response) {
+      if (response.redirected) {
+        showSplash(response.url);
+        return;
+      }
+      // Validation/auth failure - the server re-rendered this page with its
+      // usual flash message and field errors, so swap the document for that
+      // response rather than re-implementing error display in JS.
+      return response.text().then(function (html) {
+        document.open();
+        document.write(html);
+        document.close();
+      });
+    }).catch(function () {
+      if (submitBtn) submitBtn.disabled = false;
+      HTMLFormElement.prototype.submit.call(form);
+    });
+  });
+
+  function showSplash(redirectUrl) {
+    splash.classList.add("show");
+    setTimeout(function () {
+      splash.classList.remove("show");
+      splash.classList.add("hide");
+      setTimeout(function () {
+        window.location.href = redirectUrl;
+      }, 400);
+    }, 3000);
+  }
+})();
+</script>
+
 {% endblock %}
