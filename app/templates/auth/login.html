@@ -178,8 +178,8 @@
     color: var(--accent);
   }
 
-  /* Post-login splash - fades in over the login screen, holds, then fades out just
-     before navigation so the transition to the redirect target is never abrupt. */
+  /* Post-login splash - fades in over the login screen (1.5s), holds for another
+     1.5s, then navigation fires - see showSplash() below for the matching timing. */
   .login-splash {
     position: fixed;
     inset: 0;
@@ -190,7 +190,7 @@
     justify-content: center;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.5s ease;
+    transition: opacity 1.5s ease;
   }
   .login-splash.show {
     opacity: 1;
@@ -204,7 +204,7 @@
     text-align: center;
     opacity: 0;
     transform: scale(0.92);
-    transition: opacity 0.5s ease, transform 0.5s ease;
+    transition: opacity 1.5s ease, transform 1.5s ease;
   }
   .login-splash.show .login-splash-content {
     opacity: 1;
@@ -265,6 +265,8 @@
     // show through again just before navigating away.
     document.getElementById("login-screen").style.display = "none";
     splash.classList.add("show");
+    // 1.5s fade-in (matches the CSS transition duration above) + 1.5s hold
+    // before navigating.
     setTimeout(function () {
       window.location.href = redirectUrl;
     }, 3000);
