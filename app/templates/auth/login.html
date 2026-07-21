@@ -43,6 +43,7 @@
   .login-body {
     overflow: hidden;
     height: 100dvh;
+    background: var(--bg);
   }
   .login-body nav.navbar,
   .login-body footer {
@@ -195,10 +196,6 @@
     opacity: 1;
     pointer-events: auto;
   }
-  .login-splash.hide {
-    opacity: 0;
-    transition: opacity 0.4s ease;
-  }
 
   .login-splash-content {
     display: flex;
@@ -263,13 +260,13 @@
   });
 
   function showSplash(redirectUrl) {
+    // The login card is hidden the instant the splash starts, not faded out
+    // alongside it - otherwise the two overlapping fades let the login form
+    // show through again just before navigating away.
+    document.getElementById("login-screen").style.display = "none";
     splash.classList.add("show");
     setTimeout(function () {
-      splash.classList.remove("show");
-      splash.classList.add("hide");
-      setTimeout(function () {
-        window.location.href = redirectUrl;
-      }, 400);
+      window.location.href = redirectUrl;
     }, 3000);
   }
 })();

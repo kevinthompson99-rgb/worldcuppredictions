@@ -7,6 +7,26 @@
     <div class="about-name">LEPREM</div>
     <p class="about-desc">Premier League Predictions</p>
     <p class="about-version">Version {{ app_version }}</p>
+
+    <div class="about-section">
+      <h5 class="about-heading">How scoring works</h5>
+      <ul class="about-body-text">
+        <li>Correct result (win/draw/loss): <strong>6 points</strong></li>
+        <li>Exact score: <strong>16 points</strong> (includes the 6)</li>
+        <li>Wrong result: 0 points</li>
+      </ul>
+    </div>
+
+    <div class="about-section">
+      <h5 class="about-heading">Gameweeks</h5>
+      <p class="about-body-text">All 38 Premier League gameweeks are synced in automatically as the season's fixtures are confirmed. The admin publishes each one when it's ready; predictions lock 5 minutes before the gameweek's first kick-off.</p>
+    </div>
+
+    <div class="about-section">
+      <h5 class="about-heading">Every match counts</h5>
+      <p class="about-body-text">Every fixture is scored on its full-time result &mdash; a draw is just as valid a prediction as a win, every single gameweek.</p>
+    </div>
+
     <a class="about-back" href="{{ url_for('main.index') }}">&larr; Back to home</a>
   </div>
 </div>
@@ -45,6 +65,27 @@
     margin: 1.5rem 0 0;
     color: #6c757d;
     font-size: 0.75rem;
+  }
+  .about-section {
+    text-align: left;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  .about-heading {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem;
+  }
+  .about-body-text {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+  p.about-body-text {
+    padding-left: 0;
   }
   .about-back {
     display: inline-block;

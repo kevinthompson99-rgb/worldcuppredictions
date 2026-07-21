@@ -85,7 +85,7 @@ def service_worker():
 def index():
     if current_user.is_authenticated:
         return redirect(url_for("main.players"))
-    return render_template("main/index.html")
+    return redirect(url_for("auth.login"))
 
 
 @bp.route("/about")
