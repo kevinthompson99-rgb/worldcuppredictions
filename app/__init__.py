@@ -323,10 +323,8 @@ def register_cli(app):
 
 def register_template_helpers(app):
     from datetime import datetime
-    from zoneinfo import ZoneInfo
 
-    UTC = ZoneInfo("UTC")
-    LONDON = ZoneInfo("Europe/London")
+    from app.time_utils import to_london
 
     @app.context_processor
     def inject_now():
@@ -347,6 +345,4 @@ def register_template_helpers(app):
         `%Z` in the default format then renders the right abbreviation for the
         date in question, rather than a hard-coded "UTC"/"BST" label.
         """
-        if value is None:
-            return ""
-        return value.replace(tzinfo=UTC).astimezone(LONDON).strftime(fmt)
+        return to_london(value, fmt)

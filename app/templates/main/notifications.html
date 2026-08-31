@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block body_class %}notifications-body{% endblock %}
+{% block content %}
+<div class="notifications-page">
+  <div class="notifications-brand">
+    <span class="notifications-logo">LEPREM</span>
+  </div>
+  <h1 class="notifications-h1">Notifications</h1>
+
+  <div class="round-card">
+    <p id="js-push-unsupported" class="notifications-muted" hidden>
+      Push notifications aren&rsquo;t supported on this browser.
+    </p>
+    <p id="js-push-denied" class="notifications-muted" hidden>
+      Notifications are blocked for LEPREM. Enable them for this site in your device or browser settings, then come back to this page.
+    </p>
+    <div id="js-push-controls" hidden>
+      <p class="notifications-hint">
+        Get a nudge 24 hours and 1 hour before predictions close, when a new gameweek opens, and when results are in.
+      </p>
+      <button type="button" id="js-push-toggle" class="btn btn-accent btn-lg notifications-toggle">Enable match notifications</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var VAPID_PUBLIC_KEY = {{ vapid_public_key | tojson }};
+  var CSRF_TOKEN = {{ csrf_token() | tojson }};
+
+  var unsupportedEl = document.getElementById('js-push-unsupported');
+  var deniedEl = document.getElementById('js-push-denied');
+  var controlsEl = document.getElementById('js-push-controls');
+  var toggleBtn = document.getElementById('js-push-toggle');
+
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; i++) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  function setButtonState(subscribed) {
+    toggleBtn.textContent = subscribed ? 'Disable notifications' : 'Enable match notifications';
+    toggleBtn.classList.toggle('btn-accent', !subscribed);
+    toggleBtn.classList.toggle('btn-outline-light', subscribed);
+  }
+
+  function postJSON(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify(body || {})
+    });
+  }
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    unsupportedEl.hidden = false;
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    deniedEl.hidden = false;
+    return;
+  }
+
+  controlsEl.hidden = false;
+  setButtonState(localStorage.getItem('push_subscribed') === '1');
+
+  toggleBtn.addEventListener('click', function () {
+    var subscribed = localStorage.getItem('push_subscribed') === '1';
+    toggleBtn.disabled = true;
+
+    if (subscribed) {
+      navigator.serviceWorker.ready
+        .then(function (reg) { return reg.pushManager.getSubscription(); })
+        .then(function (sub) {
+          var endpoint = sub ? sub.endpoint : null;
+          var unsub = sub ? sub.unsubscribe() : Promise.resolve();
+          return unsub.then(function () { return postJSON('/push/unsubscribe', { endpoint: endpoint }); });
+        })
+        .then(function () {
+          localStorage.setItem('push_subscribed', '0');
+          setButtonState(false);
+        })
+        .catch(function () {
+          // Leave the state as-is on failure so the user can retry.
+        })
+        .then(function () { toggleBtn.disabled = false; });
+      return;
+    }
+
+    Notification.requestPermission().then(function (permission) {
+      if (permission !== 'granted') {
+        toggleBtn.disabled = false;
+        if (permission === 'denied') {
+          controlsEl.hidden = true;
+          deniedEl.hidden = false;
+        }
+        return;
+      }
+
+      navigator.serviceWorker.ready
+        .then(function (reg) {
+          return reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+          });
+        })
+        .then(function (sub) {
+          var raw = sub.toJSON();
+          return postJSON('/push/subscribe', {
+            endpoint: raw.endpoint,
+            p256dh: raw.keys.p256dh,
+            auth: raw.keys.auth
+          });
+        })
+        .then(function () {
+          localStorage.setItem('push_subscribed', '1');
+          setButtonState(true);
+        })
+        .catch(function () {
+          // Subscription failed - leave the button in its unsubscribed state.
+        })
+        .then(function () { toggleBtn.disabled = false; });
+    });
+  });
+})();
+</script>
+
+<style>
+  body.notifications-body {
+    background: var(--bg);
+  }
+  body.notifications-body .navbar,
+  body.notifications-body footer {
+    background-color: var(--bg) !important;
+  }
+  .notifications-page {
+    color: #e9ecef;
+  }
+  .notifications-brand {
+    text-align: center;
+    margin-bottom: 1.25rem;
+  }
+  .notifications-logo {
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    font-size: 1.3rem;
+    color: #ffd166;
+  }
+  .notifications-h1 {
+    color: #fff;
+    font-size: 1.4rem;
+    margin-bottom: 0.75rem;
+  }
+  .notifications-muted, .notifications-hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .notifications-hint {
+    margin-bottom: 1rem;
+  }
+  .round-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 1rem;
+  }
+  .notifications-toggle {
+    width: 100%;
+    max-width: 24rem;
+    display: block;
+    margin: 0 auto;
+    border-color: #ffd166;
+    color: #ffd166;
+    background: transparent;
+  }
+  .notifications-toggle.btn-accent {
+    background: transparent;
+    border-color: #ffd166;
+    color: #ffd166;
+  }
+  .notifications-toggle.btn-accent:hover,
+  .notifications-toggle.btn-accent:focus {
+    background: #ffd166;
+    color: #12130f;
+  }
+  .notifications-toggle.btn-outline-light {
+    border-color: #6c757d;
+    color: #e9ecef;
+  }
+</style>
+{% endblock %}

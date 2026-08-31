@@ -53,6 +53,7 @@ class User(UserMixin, db.Model):
     # GameweekEntry) with them, or the delete fails on the FK / leaves orphans that
     # keep them showing up in the players grid and standings.
     predictions = db.relationship("Prediction", back_populates="user", lazy="dynamic", cascade="all, delete-orphan")
+    push_subscriptions = db.relationship("PushSubscription", back_populates="user", lazy="dynamic", cascade="all, delete-orphan")
 
     def set_password(self, password: str) -> None:
         # Explicit method: some platforms' Python builds lack hashlib.scrypt (werkzeug's default).
@@ -83,6 +84,12 @@ class Gameweek(db.Model):
     # Dev/testing escape hatch: lets an admin lock a gameweek on demand, bypassing the
     # kick-off-based lock_time below. See admin.force_lock_gameweek.
     force_locked = db.Column(db.Boolean, nullable=False, default=False)
+
+    # Set once the 24-hour/1-hour-to-deadline push notification has been sent for this
+    # gameweek (see app/scheduler.py) - guards against re-sending on every poll tick
+    # while lock_time still falls inside that job's window.
+    notified_24h = db.Column(db.Boolean, nullable=False, default=False)
+    notified_1h = db.Column(db.Boolean, nullable=False, default=False)
 
     fixtures = db.relationship(
         "Fixture",
@@ -300,3 +307,25 @@ class PollLog(db.Model):
 
     def __repr__(self):
         return f"<PollLog {self.mode} @ {self.run_at} ok={self.succeeded} created={self.fixtures_created} updated={self.fixtures_updated}>"
+
+
+class PushSubscription(db.Model):
+    """A browser's Web Push subscription (see app/push.py), one row per device/browser
+    a user has enabled notifications on. `endpoint` is the push service URL the browser
+    handed back from `pushManager.subscribe()` - unique per subscription, so re-subscribing
+    the same device (e.g. after clearing the permission) just updates the existing row.
+    """
+
+    __tablename__ = "push_subscriptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    endpoint = db.Column(db.Text, nullable=False, unique=True)
+    p256dh = db.Column(db.Text, nullable=False)
+    auth = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    user = db.relationship("User", back_populates="push_subscriptions")
+
+    def __repr__(self):
+        return f"<PushSubscription user={self.user_id} endpoint={self.endpoint[:40]}...>"

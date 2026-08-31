@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
@@ -13,7 +13,7 @@ from app.finance import (
 )
 from app.forms import CSRFForm
 from app.leaderboards import gameweek_leaderboard
-from app.models import Fixture, GameweekEntry, Prediction, User
+from app.models import Fixture, GameweekEntry, Prediction, PushSubscription, User
 from app.gameweek_helpers import get_active_gameweek, get_gameweek_for_leaderboard
 from app.scoring import calculate_points, POINTS_CORRECT_RESULT, POINTS_EXACT_SCORE
 
@@ -329,3 +329,44 @@ def scores_live():
         # per-user totals stay current on every refresh, not just at page load.
         totals={str(user.id): gameweek_points for user, gameweek_points, season_points in gameweek_leaderboard(gameweek)},
     )
+
+
+@bp.route("/notifications")
+@login_required
+def notifications():
+    return render_template(
+        "main/notifications.html",
+        vapid_public_key=os.environ.get("VAPID_PUBLIC_KEY", ""),
+    )
+
+
+@bp.route("/push/subscribe", methods=["POST"])
+@login_required
+def push_subscribe():
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get("endpoint")
+    p256dh = data.get("p256dh")
+    auth = data.get("auth")
+    if not endpoint or not p256dh or not auth:
+        abort(400, description="Missing endpoint, p256dh or auth.")
+
+    subscription = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if subscription is None:
+        subscription = PushSubscription(endpoint=endpoint, user_id=current_user.id)
+        db.session.add(subscription)
+    subscription.user_id = current_user.id
+    subscription.p256dh = p256dh
+    subscription.auth = auth
+    db.session.commit()
+    return jsonify(status="subscribed")
+
+
+@bp.route("/push/unsubscribe", methods=["POST"])
+@login_required
+def push_unsubscribe():
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get("endpoint")
+    if endpoint:
+        PushSubscription.query.filter_by(endpoint=endpoint, user_id=current_user.id).delete()
+        db.session.commit()
+    return jsonify(status="unsubscribed")

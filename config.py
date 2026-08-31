@@ -59,3 +59,9 @@ class Config:
 
     # Prediction lock window
     PREDICTION_LOCK_MINUTES_BEFORE_KICKOFF = 5
+
+    # Web Push (VAPID) - see app/push.py and scripts/generate_vapid_keys.py. Not set
+    # locally by default; send_push()/main.notifications degrade gracefully when unset.
+    VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
+    VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
+    VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL")

@@ -24,8 +24,10 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.extensions import db
-from app.models import Fixture, PollLog
+from app.models import GAMEWEEK_STATUS_ACTIVE, Fixture, Gameweek, PollLog
+from app.push import notify_gameweek_participants
 from app.sync import sync_fixtures_and_results
+from app.time_utils import to_london
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +154,50 @@ def _run_daily_sync(app):
         _record_poll("daily", summary=summary)
 
 
+def _run_24h_deadline_notify(app):
+    """Hourly: push opted-in players a reminder ~24h before the active gameweek locks.
+
+    Gameweek.lock_time is a computed property (from its fixtures' kick-offs), not a DB
+    column, so it can't be filtered in SQL - there's normally at most one ACTIVE gameweek
+    at a time (see admin.publish_gameweek), so loading that row and checking lock_time in
+    Python is cheap. `notified_24h` guards against re-sending on every hourly tick while
+    lock_time still sits inside the window.
+    """
+    with app.app_context():
+        now = datetime.utcnow()
+        window_start = now + timedelta(hours=23)
+        window_end = now + timedelta(hours=25)
+        for gameweek in Gameweek.query.filter_by(status=GAMEWEEK_STATUS_ACTIVE, notified_24h=False).all():
+            lock_time = gameweek.lock_time
+            if lock_time is None or not (window_start <= lock_time <= window_end):
+                continue
+            body = (
+                f"Predictions for {gameweek.name} close tomorrow at "
+                f"{to_london(lock_time)}. Get your picks in!"
+            )
+            notify_gameweek_participants(gameweek, "⏰ 24 hours to go", body, url="/predictions/")
+            gameweek.notified_24h = True
+            db.session.commit()
+            logger.info("Sent 24h deadline notification for %s", gameweek.name)
+
+
+def _run_1h_deadline_notify(app):
+    """Every 15 minutes: push opted-in players a reminder ~1h before the active gameweek locks."""
+    with app.app_context():
+        now = datetime.utcnow()
+        window_start = now + timedelta(minutes=45)
+        window_end = now + timedelta(minutes=75)
+        for gameweek in Gameweek.query.filter_by(status=GAMEWEEK_STATUS_ACTIVE, notified_1h=False).all():
+            lock_time = gameweek.lock_time
+            if lock_time is None or not (window_start <= lock_time <= window_end):
+                continue
+            body = f"Predictions for {gameweek.name} close in 1 hour. Last chance!"
+            notify_gameweek_participants(gameweek, "🚨 1 hour left", body, url="/predictions/")
+            gameweek.notified_1h = True
+            db.session.commit()
+            logger.info("Sent 1h deadline notification for %s", gameweek.name)
+
+
 def init_scheduler(app):
     """Start the background scheduler. Safe to call multiple times - only starts once."""
     global _scheduler
@@ -189,12 +235,32 @@ def init_scheduler(app):
         coalesce=True,
         max_instances=1,
     )
+    scheduler.add_job(
+        func=_run_24h_deadline_notify,
+        args=[app],
+        trigger="interval",
+        hours=1,
+        id="notify_24h",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
+    scheduler.add_job(
+        func=_run_1h_deadline_notify,
+        args=[app],
+        trigger="interval",
+        minutes=15,
+        id="notify_1h",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
 
     scheduler.start()
     _scheduler = scheduler
     logger.info(
         "Scheduler started: live poll every %d sec (active only during match windows), "
-        "daily sync at %02d:%02d UTC",
+        "daily sync at %02d:%02d UTC, 24h/1h deadline push reminders every hour/15 min",
         app.config["LIVE_POLL_INTERVAL_SECONDS"],
         app.config["DAILY_SYNC_HOUR_UTC"],
         app.config["DAILY_SYNC_MINUTE_UTC"],

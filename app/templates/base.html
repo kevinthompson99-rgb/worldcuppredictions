@@ -77,6 +77,7 @@
         <ul class="navbar-nav">
           {% if current_user.is_authenticated %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.profile') }}">{{ current_user.display_name }}</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('main.notifications') }}">Notifications</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">Log out</a></li>
           {% else %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">Log in</a></li>

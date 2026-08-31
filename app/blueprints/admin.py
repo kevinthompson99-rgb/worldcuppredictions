@@ -8,6 +8,7 @@ from app.extensions import db
 from app.finance import all_gameweeks_financial_summary, set_gameweek_stake
 from app.forms import AdminCreateUserForm, AdminEditUserForm, CSRFForm
 from app.gameweek_helpers import get_active_gameweek, get_draft_gameweek, get_draft_gameweeks
+from app.leaderboards import gameweek_leaderboard
 from app.models import (
     GAMEWEEK_STATUS_ACTIVE,
     GAMEWEEK_STATUS_COMPLETE,
@@ -18,8 +19,10 @@ from app.models import (
     PollLog,
     User,
 )
+from app.push import notify_all, notify_gameweek_participants
 from app.scoring import score_fixture
 from app.sync import sync_fixtures_and_results
+from app.time_utils import to_london
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -189,8 +192,44 @@ def publish_gameweek(gameweek_id):
 
     gameweek.status = GAMEWEEK_STATUS_ACTIVE
     db.session.commit()
+
+    notify_all(
+        "\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F "
+        f"{gameweek.name} is now open",
+        f"Make your predictions before {to_london(gameweek.lock_time)}. Good luck!",
+        url="/players",
+    )
+
     flash(f"'{gameweek.name}' is now live - users can see it and submit predictions.", "success")
     return redirect(url_for("admin.gameweek_detail", gameweek_id=gameweek_id))
+
+
+def _notify_gameweek_winner(gameweek):
+    """Push the pot result to opted-in entrants once a gameweek settles.
+
+    Winner(s) are the opted-in entrant(s) with the highest gameweek points - the same
+    definition app.finance.gameweek_financial_summary uses to decide who splits the pot.
+    """
+    entrant_ids = {entry.user_id for entry in gameweek.entries.filter_by(opted_in=True)}
+    if not entrant_ids:
+        return
+
+    ranked = [(user, points) for user, points, _ in gameweek_leaderboard(gameweek) if user.id in entrant_ids]
+    if not ranked:
+        return
+
+    top_score = ranked[0][1]
+    winners = [user for user, points in ranked if points == top_score]
+    names = [user.display_name for user in winners]
+
+    if len(names) == 1:
+        body = f"{names[0]} wins {gameweek.name} with {top_score} pts!"
+    elif len(names) == 2:
+        body = f"{names[0]} & {names[1]} tie with {top_score} pts!"
+    else:
+        body = f"{', '.join(names[:-1])} & {names[-1]} tie with {top_score} pts!"
+
+    notify_gameweek_participants(gameweek, f"\U0001F3C6 {gameweek.name} result", body, url="/leaderboard")
 
 
 @bp.route("/gameweeks/<int:gameweek_id>/complete", methods=["POST"])
@@ -213,6 +252,7 @@ def complete_gameweek(gameweek_id):
     db.session.commit()
 
     if gameweek.all_fixtures_settled:
+        _notify_gameweek_winner(gameweek)
         flash(f"'{gameweek.name}' is complete and archived.", "success")
     else:
         flash(
