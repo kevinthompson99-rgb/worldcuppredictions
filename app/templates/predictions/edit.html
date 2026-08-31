@@ -33,7 +33,7 @@
       </div>
     </div>
 
-    <form method="post" novalidate class="predictions-form">
+    <form method="post" novalidate class="predictions-form" id="js-predictions-form">
       {{ form.hidden_tag() }}
       <ul class="fixture-list">
         {% for fixture in fixtures %}
@@ -44,9 +44,9 @@
               {{ fixture.away_short_name or fixture.away_team }} <img src="{{ fixture.away_crest_url }}" alt="" class="team-crest">
             </div>
             <div class="fixture-score-entry">
-              {{ form["home_" ~ fixture.id](class_="score-input") }}
+              {{ form["home_" ~ fixture.id](class_="score-input", autocomplete="off", autocorrect="off", autocapitalize="off", inputmode="numeric") }}
               <span class="dash">&ndash;</span>
-              {{ form["away_" ~ fixture.id](class_="score-input") }}
+              {{ form["away_" ~ fixture.id](class_="score-input", autocomplete="off", autocorrect="off", autocapitalize="off", inputmode="numeric") }}
             </div>
             <div class="fixture-meta">{{ fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}</div>
             {% for field_name in ["home_" ~ fixture.id, "away_" ~ fixture.id] %}
@@ -58,7 +58,7 @@
         {% endfor %}
       </ul>
       <div class="predictions-actions">
-        <button type="submit" class="btn btn-accent btn-lg">Save my predictions</button>
+        <button type="submit" class="btn btn-accent btn-lg" id="js-save-btn">Save my predictions</button>
       </div>
     </form>
 
@@ -67,6 +67,95 @@
     </p>
   {% endif %}
 </div>
+
+<div id="js-save-overlay" class="save-overlay" role="status" aria-label="Saving predictions" aria-hidden="true">
+  <div class="save-spinner">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+  </div>
+</div>
+
+<div id="js-unsaved-modal" class="unsaved-modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="unsaved-modal-box">
+    <p class="unsaved-modal-text">Your predictions haven&rsquo;t been saved yet. Save now or your picks won&rsquo;t count.</p>
+    <div class="unsaved-modal-actions">
+      <button type="button" class="btn btn-accent btn-sm" id="js-unsaved-save">Save now</button>
+      <button type="button" class="btn btn-outline-light btn-sm" id="js-unsaved-cancel">Go back</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('js-predictions-form');
+  if (!form) { return; }
+
+  var saveBtn      = document.getElementById('js-save-btn');
+  var saveOverlay  = document.getElementById('js-save-overlay');
+  var modal        = document.getElementById('js-unsaved-modal');
+  var modalSaveBtn = document.getElementById('js-unsaved-save');
+  var modalGoBack  = document.getElementById('js-unsaved-cancel');
+
+  var dirty = false;
+  var submitting = false;
+
+  form.querySelectorAll('.score-input').forEach(function (input) {
+    input.addEventListener('input', function () { dirty = true; });
+  });
+
+  function showSaveOverlay() {
+    if (saveOverlay) { saveOverlay.classList.add('is-visible'); saveOverlay.setAttribute('aria-hidden', 'false'); }
+  }
+
+  form.addEventListener('submit', function () {
+    dirty = false;
+    submitting = true;
+    if (saveBtn) { saveBtn.disabled = true; }
+    showSaveOverlay();
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (dirty && !submitting) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+  });
+
+  function showUnsavedModal() {
+    if (modal) { modal.classList.add('is-visible'); modal.setAttribute('aria-hidden', 'false'); }
+  }
+
+  function hideUnsavedModal() {
+    if (modal) { modal.classList.remove('is-visible'); modal.setAttribute('aria-hidden', 'true'); }
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!dirty || submitting) { return; }
+    var link = e.target.closest('a[href]');
+    if (!link) { return; }
+    var hrefAttr = link.getAttribute('href');
+    if (!hrefAttr || hrefAttr === '#' || link.hasAttribute('data-bs-toggle')) { return; }
+    e.preventDefault();
+    e.stopPropagation();
+    showUnsavedModal();
+  }, true);
+
+  if (modalSaveBtn) {
+    modalSaveBtn.addEventListener('click', function () {
+      hideUnsavedModal();
+      if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); }
+    });
+  }
+
+  if (modalGoBack) {
+    modalGoBack.addEventListener('click', function () {
+      hideUnsavedModal();
+    });
+  }
+})();
+</script>
 
 <style>
   body.predictions-body {
@@ -187,6 +276,100 @@
   .predictions-actions .btn {
     width: 100%;
     max-width: 24rem;
+  }
+
+  /* ---- Full-screen save overlay ---- */
+  .save-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .save-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .save-spinner {
+    position: relative;
+    width: 40px;
+    height: 40px;
+  }
+  .save-spinner span {
+    position: absolute;
+    width: 3px;
+    height: 10px;
+    background: #fff;
+    border-radius: 2px;
+    left: 50%;
+    top: 5px;
+    margin-left: -1.5px;
+    transform-origin: 50% 15px;
+    opacity: 0.15;
+    animation: save-spinner-fade 1.2s linear infinite;
+  }
+  .save-spinner span:nth-child(1)  { transform: rotate(0deg);   animation-delay: -1.1s; }
+  .save-spinner span:nth-child(2)  { transform: rotate(30deg);  animation-delay: -1.0s; }
+  .save-spinner span:nth-child(3)  { transform: rotate(60deg);  animation-delay: -0.9s; }
+  .save-spinner span:nth-child(4)  { transform: rotate(90deg);  animation-delay: -0.8s; }
+  .save-spinner span:nth-child(5)  { transform: rotate(120deg); animation-delay: -0.7s; }
+  .save-spinner span:nth-child(6)  { transform: rotate(150deg); animation-delay: -0.6s; }
+  .save-spinner span:nth-child(7)  { transform: rotate(180deg); animation-delay: -0.5s; }
+  .save-spinner span:nth-child(8)  { transform: rotate(210deg); animation-delay: -0.4s; }
+  .save-spinner span:nth-child(9)  { transform: rotate(240deg); animation-delay: -0.3s; }
+  .save-spinner span:nth-child(10) { transform: rotate(270deg); animation-delay: -0.2s; }
+  .save-spinner span:nth-child(11) { transform: rotate(300deg); animation-delay: -0.1s; }
+  .save-spinner span:nth-child(12) { transform: rotate(330deg); animation-delay:    0s; }
+  @keyframes save-spinner-fade {
+    0%   { opacity: 1; }
+    100% { opacity: 0.15; }
+  }
+
+  /* ---- Unsaved-changes confirmation modal ---- */
+  .unsaved-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    padding: 1rem;
+    box-sizing: border-box;
+  }
+  .unsaved-modal.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .unsaved-modal-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 22rem;
+    text-align: center;
+  }
+  .unsaved-modal-text {
+    color: #e9ecef;
+    font-size: 0.9rem;
+    margin: 0 0 1rem;
+  }
+  .unsaved-modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .unsaved-modal-actions .btn {
+    width: 100%;
   }
 </style>
 {% endblock %}

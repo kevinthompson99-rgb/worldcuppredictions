@@ -61,7 +61,7 @@ def my_predictions():
 
         db.session.commit()
         flash("Your predictions have been saved.", "success")
-        return redirect(url_for("main.players"))
+        return redirect(url_for("main.index"))
 
     for fixture in fixtures:
         prediction = predictions.get(fixture.id)

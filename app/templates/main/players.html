@@ -783,6 +783,11 @@ var matchCountdown = (function () {
     --pgrid-col-w: 4.5rem;
   }
 
+  .pgrid-outer, .pgrid-outer * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   /* Corner: absolutely fixed top-left */
   .pgrid-corner {
     position: absolute;
@@ -981,7 +986,7 @@ var matchCountdown = (function () {
     color: var(--toast-text);
   }
   .score-cell.pred-exact .cell-score {
-    color: var(--accent);
+    color: #ffd166;
     font-weight: 700;
   }
   .cell-empty {
