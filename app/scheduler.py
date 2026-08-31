@@ -175,7 +175,7 @@ def _run_24h_deadline_notify(app):
                 f"Predictions for {gameweek.name} close tomorrow at "
                 f"{to_london(lock_time)}. Get your picks in!"
             )
-            notify_gameweek_participants(gameweek, "⏰ 24 hours to go", body, url="/predictions/")
+            notify_gameweek_participants(gameweek, "24 hours to go", body, url="/predictions/")
             gameweek.notified_24h = True
             db.session.commit()
             logger.info("Sent 24h deadline notification for %s", gameweek.name)
@@ -192,7 +192,7 @@ def _run_1h_deadline_notify(app):
             if lock_time is None or not (window_start <= lock_time <= window_end):
                 continue
             body = f"Predictions for {gameweek.name} close in 1 hour. Last chance!"
-            notify_gameweek_participants(gameweek, "🚨 1 hour left", body, url="/predictions/")
+            notify_gameweek_participants(gameweek, "1 hour left", body, url="/predictions/")
             gameweek.notified_1h = True
             db.session.commit()
             logger.info("Sent 1h deadline notification for %s", gameweek.name)

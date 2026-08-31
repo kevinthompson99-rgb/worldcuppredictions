@@ -194,7 +194,6 @@ def publish_gameweek(gameweek_id):
     db.session.commit()
 
     notify_all(
-        "\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F "
         f"{gameweek.name} is now open",
         f"Make your predictions before {to_london(gameweek.lock_time)}. Good luck!",
         url="/players",
@@ -229,7 +228,7 @@ def _notify_gameweek_winner(gameweek):
     else:
         body = f"{', '.join(names[:-1])} & {names[-1]} tie with {top_score} pts!"
 
-    notify_gameweek_participants(gameweek, f"\U0001F3C6 {gameweek.name} result", body, url="/leaderboard")
+    notify_gameweek_participants(gameweek, f"{gameweek.name} result", body, url="/leaderboard")
 
 
 @bp.route("/gameweeks/<int:gameweek_id>/complete", methods=["POST"])
@@ -508,7 +507,7 @@ def test_push():
         abort(400)
     from app.push import notify_all
     sent, total = notify_all(
-        title="\U0001F514 LEPREM Test",
+        title="LEPREM Test",
         body="Push notifications are working!",
         url="/"
     )
