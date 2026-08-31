@@ -181,5 +181,20 @@
     });
   })();
   </script>
+
+  <script>
+  (function () {
+    // Clear the home-screen icon badge (set by sw.js on push) whenever the app is
+    // opened or brought to the foreground - covers dismissing a notification without
+    // tapping it, not just the notificationclick handler in sw.js.
+    if (!("clearAppBadge" in navigator)) return;
+    navigator.clearAppBadge().catch(function () {});
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") {
+        navigator.clearAppBadge().catch(function () {});
+      }
+    });
+  })();
+  </script>
 </body>
 </html>

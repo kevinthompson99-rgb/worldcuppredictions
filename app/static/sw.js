@@ -95,11 +95,24 @@ self.addEventListener("push", function(event) {
     badge: "/static/icons/icon-192.png",
     data: { url: payload.url || "/" }
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  // The app's home-screen icon badge (the little red counter) is a separate API
+  // from the notification itself - showNotification() alone never sets it. We
+  // don't track a real unread count, so this just flags "something new" and gets
+  // cleared again once the app is opened (see base.html) or the notification is
+  // tapped (below).
+  var tasks = [self.registration.showNotification(title, options)];
+  if ("setAppBadge" in self.navigator) {
+    tasks.push(self.navigator.setAppBadge(1).catch(function () {}));
+  }
+  event.waitUntil(Promise.all(tasks));
 });
 
 self.addEventListener("notificationclick", function(event) {
   event.notification.close();
+  if ("clearAppBadge" in self.navigator) {
+    self.navigator.clearAppBadge().catch(function () {});
+  }
   var url = event.notification.data.url;
   // clients.openWindow() alone often just re-focuses an already-open PWA window on
   // iOS instead of navigating it - explicitly find an existing window and navigate
