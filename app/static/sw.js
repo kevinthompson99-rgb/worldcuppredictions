@@ -100,5 +100,25 @@ self.addEventListener("push", function(event) {
 
 self.addEventListener("notificationclick", function(event) {
   event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.url));
+  var url = event.notification.data.url;
+  // clients.openWindow() alone often just re-focuses an already-open PWA window on
+  // iOS instead of navigating it - explicitly find an existing window and navigate
+  // it first, falling back to opening a new one only if none is open.
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if ("focus" in client) {
+          var focused = client.focus();
+          if ("navigate" in client) {
+            return client.navigate(url).then(function () { return focused; }).catch(function () { return focused; });
+          }
+          return focused;
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
 });

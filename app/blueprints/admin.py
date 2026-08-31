@@ -508,7 +508,7 @@ def test_push():
         abort(400)
     from app.push import notify_all
     sent, total = notify_all(
-        title="\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F LEPREM Test",
+        title="\U0001F514 LEPREM Test",
         body="Push notifications are working!",
         url="/"
     )
