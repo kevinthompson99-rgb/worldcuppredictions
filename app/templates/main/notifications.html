@@ -20,6 +20,7 @@
         Get a nudge 24 hours and 1 hour before predictions close, when a new gameweek opens, and when results are in.
       </p>
       <button type="button" id="js-push-toggle" class="btn btn-accent btn-lg notifications-toggle">Enable match notifications</button>
+      <p id="js-push-error" class="notifications-error" hidden></p>
     </div>
   </div>
 </div>
@@ -33,6 +34,19 @@
   var deniedEl = document.getElementById('js-push-denied');
   var controlsEl = document.getElementById('js-push-controls');
   var toggleBtn = document.getElementById('js-push-toggle');
+  var errorEl = document.getElementById('js-push-error');
+
+  function showError(context, err) {
+    console.error('[push]', context, err);
+    var message = err && (err.message || err.name) ? (err.message || err.name) : String(err);
+    errorEl.textContent = context + ': ' + message;
+    errorEl.hidden = false;
+  }
+
+  function clearError() {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
 
   function urlBase64ToUint8Array(base64String) {
     var padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -72,7 +86,13 @@
   controlsEl.hidden = false;
   setButtonState(localStorage.getItem('push_subscribed') === '1');
 
+  if (!VAPID_PUBLIC_KEY) {
+    showError('Setup', 'Push isn\'t configured on the server yet (missing VAPID public key)');
+    toggleBtn.disabled = true;
+  }
+
   toggleBtn.addEventListener('click', function () {
+    clearError();
     var subscribed = localStorage.getItem('push_subscribed') === '1';
     toggleBtn.disabled = true;
 
@@ -88,44 +108,57 @@
           localStorage.setItem('push_subscribed', '0');
           setButtonState(false);
         })
-        .catch(function () {
+        .catch(function (err) {
           // Leave the state as-is on failure so the user can retry.
+          showError('Unsubscribe failed', err);
         })
         .then(function () { toggleBtn.disabled = false; });
       return;
     }
 
+    console.log('[push] requesting notification permission...');
     Notification.requestPermission().then(function (permission) {
+      console.log('[push] permission result:', permission);
       if (permission !== 'granted') {
         toggleBtn.disabled = false;
         if (permission === 'denied') {
           controlsEl.hidden = true;
           deniedEl.hidden = false;
+        } else {
+          showError('Permission not granted', 'Notification.requestPermission() returned "' + permission + '"');
         }
         return;
       }
 
       navigator.serviceWorker.ready
         .then(function (reg) {
+          console.log('[push] service worker ready, subscribing...');
           return reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
           });
         })
         .then(function (sub) {
+          console.log('[push] subscribed, posting to server:', sub.endpoint);
           var raw = sub.toJSON();
           return postJSON('/push/subscribe', {
             endpoint: raw.endpoint,
             p256dh: raw.keys.p256dh,
             auth: raw.keys.auth
+          }).then(function (resp) {
+            if (!resp.ok) {
+              throw new Error('Server returned ' + resp.status);
+            }
           });
         })
         .then(function () {
+          console.log('[push] subscribe complete');
           localStorage.setItem('push_subscribed', '1');
           setButtonState(true);
         })
-        .catch(function () {
+        .catch(function (err) {
           // Subscription failed - leave the button in its unsubscribed state.
+          showError('Subscribe failed', err);
         })
         .then(function () { toggleBtn.disabled = false; });
     });
@@ -165,6 +198,12 @@
   }
   .notifications-hint {
     margin-bottom: 1rem;
+  }
+  .notifications-error {
+    color: var(--status-wrong, #ff6b6b);
+    font-size: 0.8rem;
+    margin: 0.75rem 0 0;
+    text-align: center;
   }
   .round-card {
     background: var(--panel);
