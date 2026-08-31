@@ -84,5 +84,10 @@
   gameweek from the API's own matchday number &mdash; use "Manage gameweeks" to publish
   each one when it's ready, or to review any fixtures flagged after a rearrangement.
 </p>
+
+<form method="post" action="{{ url_for('admin.test_push') }}" class="d-inline">
+  {{ form.hidden_tag() }}
+  <button type="submit" class="btn btn-sm btn-outline-warning">Send test notification</button>
+</form>
 </div>
 {% endblock %}

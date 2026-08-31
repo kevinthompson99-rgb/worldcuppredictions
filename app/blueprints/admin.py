@@ -498,3 +498,19 @@ def delete_user(user_id):
     db.session.commit()
     flash(f"Deleted user '{username}' and all their predictions/gameweek entries.", "info")
     return redirect(url_for("admin.users"))
+
+
+# TODO: temporary - remove once push notifications have been verified working end to end.
+@bp.route("/push/test", methods=["POST"])
+def test_push():
+    form = CSRFForm()
+    if not form.validate_on_submit():
+        abort(400)
+    from app.push import notify_all
+    notify_all(
+        title="\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F LEPREM Test",
+        body="Push notifications are working!",
+        url="/"
+    )
+    flash("Test notification sent to all subscribers.", "success")
+    return redirect(url_for("admin.dashboard"))
