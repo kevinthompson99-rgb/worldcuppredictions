@@ -22,11 +22,14 @@ logger = logging.getLogger(__name__)
 
 
 def send_push(subscription, title, body, url="/"):
+    """Send to one subscription. Returns True if delivered, False otherwise (VAPID not
+    configured, the subscription is gone, or any other failure - all logged, never raised).
+    """
     vapid_private_key = current_app.config.get("VAPID_PRIVATE_KEY")
     vapid_claims_email = current_app.config.get("VAPID_CLAIMS_EMAIL")
     if not vapid_private_key or not vapid_claims_email:
         logger.warning("Push not sent (VAPID keys not configured): %s", title)
-        return
+        return False
 
     try:
         webpush(
@@ -38,6 +41,7 @@ def send_push(subscription, title, body, url="/"):
             vapid_private_key=vapid_private_key,
             vapid_claims={"sub": vapid_claims_email},
         )
+        return True
     except WebPushException as exc:
         status_code = exc.response.status_code if exc.response is not None else None
         if status_code in (404, 410):
@@ -45,23 +49,30 @@ def send_push(subscription, title, body, url="/"):
             db.session.commit()
         else:
             logger.warning("Push send failed (endpoint=%s): %s", subscription.endpoint, exc)
+        return False
     except Exception as exc:  # noqa: BLE001 - a bad send must never take down the caller
         logger.warning("Push send failed (endpoint=%s): %s", subscription.endpoint, exc)
+        return False
 
 
 def notify_all(title, body, url="/"):
-    for subscription in PushSubscription.query.all():
-        send_push(subscription, title, body, url)
+    """Returns (sent, total) so callers can report delivery diagnostics if they want to."""
+    subscriptions = PushSubscription.query.all()
+    sent = sum(1 for subscription in subscriptions if send_push(subscription, title, body, url))
+    return sent, len(subscriptions)
 
 
 def notify_gameweek_participants(gameweek, title, body, url="/"):
-    """Send to users opted in (GameweekEntry.opted_in=True) to `gameweek`'s pot."""
+    """Send to users opted in (GameweekEntry.opted_in=True) to `gameweek`'s pot.
+
+    Returns (sent, total) so callers can report delivery diagnostics if they want to.
+    """
     user_ids = {
         entry.user_id
         for entry in GameweekEntry.query.filter_by(gameweek_id=gameweek.id, opted_in=True)
     }
     if not user_ids:
-        return
+        return 0, 0
     subscriptions = PushSubscription.query.filter(PushSubscription.user_id.in_(user_ids)).all()
-    for subscription in subscriptions:
-        send_push(subscription, title, body, url)
+    sent = sum(1 for subscription in subscriptions if send_push(subscription, title, body, url))
+    return sent, len(subscriptions)

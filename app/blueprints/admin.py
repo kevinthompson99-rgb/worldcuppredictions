@@ -507,10 +507,19 @@ def test_push():
     if not form.validate_on_submit():
         abort(400)
     from app.push import notify_all
-    notify_all(
+    sent, total = notify_all(
         title="\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F LEPREM Test",
         body="Push notifications are working!",
         url="/"
     )
-    flash("Test notification sent to all subscribers.", "success")
+    if total == 0:
+        flash(
+            "No push subscriptions found - nothing to send. Enable notifications for this "
+            "device from the Notifications screen first.",
+            "warning",
+        )
+    elif sent == total:
+        flash(f"Test notification sent to all {total} subscriber(s).", "success")
+    else:
+        flash(f"Sent to {sent} of {total} subscriber(s) - check server logs for the rest.", "warning")
     return redirect(url_for("admin.dashboard"))
