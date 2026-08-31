@@ -101,10 +101,19 @@ self.addEventListener("push", function(event) {
   // don't track a real unread count, so this just flags "something new" and gets
   // cleared again once the app is opened (see base.html) or the notification is
   // tapped (below).
+  //
+  // iOS's Badging API support inside a service worker is unreliable even though
+  // it works from a page - try it directly here, but also ask any open window to
+  // set it from its own page context, which is more likely to actually work.
   var tasks = [self.registration.showNotification(title, options)];
   if ("setAppBadge" in self.navigator) {
     tasks.push(self.navigator.setAppBadge(1).catch(function () {}));
   }
+  tasks.push(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+      clientList.forEach(function (client) { client.postMessage({ type: "SET_APP_BADGE" }); });
+    })
+  );
   event.waitUntil(Promise.all(tasks));
 });
 
