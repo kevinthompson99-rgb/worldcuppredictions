@@ -71,13 +71,29 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("push", function(event) {
-  var data = event.data ? event.data.json() : {};
-  var title = data.title || "LEPREM";
+  // event.data.json() can throw (decryption hiccup, or a payload that isn't valid
+  // JSON) - if it does without a try/catch, the handler throws before
+  // event.waitUntil() is ever called, and the browser falls back to its own blank
+  // "generic" notification (a push event MUST result in *some* notification per
+  // spec) - which is exactly a silent, empty banner with no useful click target.
+  // Falling back to the raw payload text at least makes a decryption/format
+  // problem visible instead of invisible.
+  var payload = {};
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (jsonErr) {
+      var raw;
+      try { raw = event.data.text(); } catch (textErr) { raw = "(unreadable push payload)"; }
+      payload = { title: "LEPREM", body: raw };
+    }
+  }
+  var title = payload.title || "LEPREM";
   var options = {
-    body: data.body || "",
+    body: payload.body || "",
     icon: "/static/icons/icon-192.png",
     badge: "/static/icons/icon-192.png",
-    data: { url: data.url || "/" }
+    data: { url: payload.url || "/" }
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
