@@ -302,15 +302,43 @@
 </script>
 
 <style>
+  html:has(body.history-body),
   body.history-body {
-    background: var(--bg);
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
-  body.history-body .navbar,
-  body.history-body footer {
+  body.history-body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    background: #121417;
+    display: flex;
+    flex-direction: column;
+  }
+  body.history-body .navbar {
     background-color: var(--bg) !important;
+    flex: 0 0 auto;
+    margin-bottom: 0.25rem !important;
+  }
+  body.history-body footer {
+    display: none;
+  }
+  body.history-body > div.container {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   .history-page {
     color: #e9ecef;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2rem;
   }
   .history-h1 {
     color: #fff;
@@ -398,6 +426,7 @@
     position: relative;
     width: 100%;
     height: min(60vh, 26rem);
+    max-height: calc(100dvh - 16rem);
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: 0.6rem;
