@@ -297,6 +297,9 @@ def leaderboard():
     return render_template(
         "main/leaderboard.html",
         gameweek=gameweek,
+        # get_gameweek_for_leaderboard() already prefers the active gameweek, falling
+        # back to the most recently completed one - matchday is its "GW<n>" number.
+        current_gameweek_number=gameweek.matchday if gameweek is not None else None,
         financial_summary=gameweek_financial_summary(gameweek) if gameweek is not None else None,
         season_financial_rows=season_financial_table(),
         completed_gameweeks=completed_gameweeks,

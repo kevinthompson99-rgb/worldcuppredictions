@@ -8,13 +8,13 @@
 
   <ul class="nav nav-pills lb-tabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link{{ ' active' if active_tab == 'round' }}" data-bs-toggle="tab" data-bs-target="#lb-round" type="button" role="tab">This gameweek</button>
+      <button class="nav-link{{ ' active' if active_tab == 'round' }}" data-bs-toggle="tab" data-bs-target="#lb-round" type="button" role="tab">{{ ('GW' ~ current_gameweek_number) if current_gameweek_number else 'This Gameweek' }}</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lb-season" type="button" role="tab">Season</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link{{ ' active' if active_tab == 'gameweek' }}" data-bs-toggle="tab" data-bs-target="#lb-gameweek" type="button" role="tab">By Gameweek</button>
+      <button class="nav-link{{ ' active' if active_tab == 'gameweek' }}" data-bs-toggle="tab" data-bs-target="#lb-gameweek" type="button" role="tab">Archive</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lb-stats" type="button" role="tab">Stats</button>
@@ -182,9 +182,20 @@
   }
   .lb-tabs {
     margin-top: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.35rem;
+  }
+  .lb-tabs .nav-item {
+    flex: 0 0 auto;
   }
   .lb-tabs .nav-link {
     color: var(--text-muted);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    border-radius: 0.4rem;
   }
   .lb-tabs .nav-link.active {
     background-color: var(--accent);

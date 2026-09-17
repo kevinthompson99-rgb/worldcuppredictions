@@ -107,8 +107,10 @@ def gameweek_financial_summary(gameweek):
 def season_financial_table():
     """Cumulative points + balance for every user who has opted in to at least one gameweek.
 
-    Ordered by cumulative season points (highest first). Balances only include settled
-    gameweeks - a gameweek still in progress doesn't move anyone's total yet.
+    Ordered by cumulative balance (highest first) - balance is what actually settles
+    the season - with cumulative season points as the tiebreaker. Balances only
+    include settled gameweeks - a gameweek still in progress doesn't move anyone's
+    total yet.
     """
     participated = set()
     balances = {}
@@ -121,11 +123,13 @@ def season_financial_table():
             if row["financial_result"] is not None:
                 balances[user_id] = balances.get(user_id, Decimal("0")) + row["financial_result"]
 
-    return [
+    rows = [
         (user, points, balances.get(user.id, Decimal("0")))
         for user, points in season_standings()
         if user.id in participated
     ]
+    rows.sort(key=lambda row: (-row[2], -row[1], row[0].display_name))
+    return rows
 
 
 def all_gameweeks_financial_summary():
