@@ -55,17 +55,25 @@
             <div class="pgrid-left" id="pgrid-left-{{ gw.id }}">
               <div class="pgrid-left-inner" id="pgrid-left-inner-{{ gw.id }}">
                 {% for row in entry.grid %}
-                <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}">
-                  <div class="fixture-teams">
+                <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}"{% if gw.is_locked %} data-live-url="{{ url_for('main.live_match', fixture_id=row.fixture.id) }}"{% endif %}>
+                  <div class="fixture-teams js-fixture-teams">
                     {% if row.fixture.is_finished %}
                       <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score }} &ndash; {{ row.fixture.away_score }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
+                    {% elif row.fixture.is_live %}
+                      {% set h = row.fixture.home_score if row.fixture.home_score is not none else 0 %}
+                      {% set a = row.fixture.away_score if row.fixture.away_score is not none else 0 %}
+                      <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
                     {% else %}
                       <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
                     {% endif %}
                   </div>
-                  <div class="fixture-meta">
+                  <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
                     {% if row.fixture.is_finished %}
                       <span class="fixture-ft">FT</span>
+                    {% elif row.fixture.status == 'PAUSED' %}
+                      <span class="live-badge live-badge-ht">HT</span>
+                    {% elif row.fixture.is_live_minute %}
+                      <span class="live-badge live-badge-live">{{ row.fixture.minute_display or 'LIVE' }}</span>
                     {% else %}
                       {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
                     {% endif %}
@@ -80,9 +88,11 @@
               {% for row in entry.grid %}
               <div class="pgrid-body-row">
                 {% for cell in row.cells %}
-                <div class="score-cell{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}">
+                <div class="score-cell{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
+                     data-fixture-id="{{ row.fixture.id }}"
+                     {% if cell.prediction %}data-predicted-home="{{ cell.prediction.predicted_home }}" data-predicted-away="{{ cell.prediction.predicted_away }}"{% endif %}>
                   {% if cell.status == 'hidden' %}
-                    <span class="cell-icon clock-icon" title="Hidden">&#9201;</span>
+                    <span class="cell-icon clock-icon" title="Submitted &mdash; hidden until the gameweek locks">&#9201;</span>
                   {% elif cell.status == 'no_pick' %}
                     <span class="cell-empty" title="No prediction submitted">&ndash;</span>
                   {% else %}
@@ -476,6 +486,12 @@
     background: var(--panel);
     text-align: left;
   }
+  .pgrid-fixture-cell[data-live-url] {
+    cursor: pointer;
+  }
+  .pgrid-fixture-cell[data-live-url]:active {
+    background: var(--panel-alt);
+  }
 
   .pgrid-body {
     position: absolute;
@@ -542,10 +558,24 @@
     font-weight: 700;
     color: #e9ecef;
   }
+  .fixture-score-live {
+    font-weight: 700;
+    color: var(--status-wrong);
+  }
   .fixture-ft {
     font-weight: 700;
     color: #fff;
     letter-spacing: 0.04em;
+  }
+  .live-badge {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .live-badge-live {
+    color: var(--status-correct);
+  }
+  .live-badge-ht {
+    color: var(--status-pending);
   }
 
   .score-cell {
