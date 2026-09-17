@@ -90,6 +90,9 @@ class Gameweek(db.Model):
     # while lock_time still falls inside that job's window.
     notified_24h = db.Column(db.Boolean, nullable=False, default=False)
     notified_1h = db.Column(db.Boolean, nullable=False, default=False)
+    # Same guard, for the "final fixture permutations" push sent ~1h before the
+    # gameweek's last remaining fixture kicks off (see app.permutations).
+    notified_permutations = db.Column(db.Boolean, nullable=False, default=False)
 
     fixtures = db.relationship(
         "Fixture",

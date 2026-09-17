@@ -25,6 +25,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.extensions import db
 from app.models import GAMEWEEK_STATUS_ACTIVE, Fixture, Gameweek, PollLog
+from app.permutations import build_permutations_notification, calculate_final_permutations
 from app.push import notify_gameweek_participants
 from app.sync import sync_fixtures_and_results
 from app.time_utils import to_london
@@ -198,6 +199,37 @@ def _run_1h_deadline_notify(app):
             logger.info("Sent 1h deadline notification for %s", gameweek.name)
 
 
+def _run_final_permutations_notify(app):
+    """Every 15 minutes: once the active gameweek is down to exactly one unplayed
+    fixture and that fixture kicks off in about an hour, push every opted-in
+    player a plain-English summary of what final result they need to win (or
+    share) the pot. `notified_permutations` guards against re-sending on every
+    tick while the fixture's kick-off still sits inside that window.
+    """
+    with app.app_context():
+        now = datetime.utcnow()
+        window_start = now + timedelta(minutes=45)
+        window_end = now + timedelta(minutes=75)
+        for gameweek in Gameweek.query.filter_by(status=GAMEWEEK_STATUS_ACTIVE, notified_permutations=False).all():
+            unfinished = [fixture for fixture in gameweek.fixtures.all() if not fixture.is_finished]
+            if len(unfinished) != 1:
+                continue
+
+            final_fixture = unfinished[0]
+            if not (window_start <= final_fixture.kickoff_at <= window_end):
+                continue
+
+            result = calculate_final_permutations(gameweek)
+            if result is None:
+                continue
+
+            title, body = build_permutations_notification(result)
+            notify_gameweek_participants(gameweek, title, body, url="/leaderboard")
+            gameweek.notified_permutations = True
+            db.session.commit()
+            logger.info("Sent final-fixture permutations notification for %s", gameweek.name)
+
+
 def init_scheduler(app):
     """Start the background scheduler. Safe to call multiple times - only starts once."""
     global _scheduler
@@ -255,12 +287,22 @@ def init_scheduler(app):
         coalesce=True,
         max_instances=1,
     )
+    scheduler.add_job(
+        func=_run_final_permutations_notify,
+        args=[app],
+        trigger="interval",
+        minutes=15,
+        id="notify_permutations",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
 
     scheduler.start()
     _scheduler = scheduler
     logger.info(
         "Scheduler started: live poll every %d sec (active only during match windows), "
-        "daily sync at %02d:%02d UTC, 24h/1h deadline push reminders every hour/15 min",
+        "daily sync at %02d:%02d UTC, 24h/1h/final-permutations push reminders every hour/15 min/15 min",
         app.config["LIVE_POLL_INTERVAL_SECONDS"],
         app.config["DAILY_SYNC_HOUR_UTC"],
         app.config["DAILY_SYNC_MINUTE_UTC"],
