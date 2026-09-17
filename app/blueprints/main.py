@@ -140,7 +140,20 @@ def _completed_gameweek_rounds():
         users = [user for user in User.query.order_by(User.display_name.asc()).all() if user.id in entrant_ids]
 
         standings = [row for row in gameweek_leaderboard(gameweek) if row[0].id in entrant_ids]
-        winner = standings[0][0] if standings else None
+
+        # Winner(s) are every opted-in entrant tied on the top score - the same
+        # definition admin._notify_gameweek_winner uses for the result push, so the
+        # two never disagree about who actually won (or that it was a tie).
+        winner = None
+        if standings:
+            top_score = standings[0][1]
+            names = [user.display_name for user, points, _season_points in standings if points == top_score]
+            if len(names) == 1:
+                winner = names[0]
+            elif len(names) == 2:
+                winner = f"{names[0]} & {names[1]}"
+            else:
+                winner = f"{', '.join(names[:-1])} & {names[-1]}"
 
         rounds.append({
             "gameweek": gameweek,
