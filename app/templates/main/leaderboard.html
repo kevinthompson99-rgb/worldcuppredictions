@@ -8,13 +8,13 @@
 
   <ul class="nav nav-pills lb-tabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link{{ ' active' if active_tab == 'round' }}" data-bs-toggle="tab" data-bs-target="#lb-round" type="button" role="tab">{{ ('GW' ~ current_gameweek_number) if current_gameweek_number else 'This Gameweek' }}</button>
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#lb-round" type="button" role="tab">{{ ('GW' ~ current_gameweek_number) if current_gameweek_number else 'This Gameweek' }}</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lb-season" type="button" role="tab">Season</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link{{ ' active' if active_tab == 'gameweek' }}" data-bs-toggle="tab" data-bs-target="#lb-gameweek" type="button" role="tab">Archive</button>
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lb-results" type="button" role="tab">Results</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lb-stats" type="button" role="tab">Stats</button>
@@ -22,7 +22,7 @@
   </ul>
 
   <div class="tab-content lb-tab-content">
-    <div class="tab-pane fade{{ ' show active' if active_tab == 'round' }}" id="lb-round" role="tabpanel">
+    <div class="tab-pane fade show active" id="lb-round" role="tabpanel">
       {% if gameweek is none %}
         <p class="leaderboard-muted">There's no gameweek to show a leaderboard for yet.</p>
       {% else %}
@@ -77,34 +77,111 @@
       {% endif %}
     </div>
 
-    <div class="tab-pane fade{{ ' show active' if active_tab == 'gameweek' }}" id="lb-gameweek" role="tabpanel">
+    <div class="tab-pane fade" id="lb-results" role="tabpanel">
       {% if not completed_gameweeks %}
         <p class="leaderboard-muted">No completed gameweeks yet &ndash; check back once one wraps up.</p>
       {% else %}
-        <form method="get" action="{{ url_for('main.leaderboard') }}" class="lb-gw-select-form">
-          <select name="gw" class="lb-gw-select" onchange="this.form.submit()" aria-label="Select gameweek">
-            {% for gw in completed_gameweeks | reverse %}
-              <option value="{{ gw.id }}"{{ ' selected' if gw.id == selected_gameweek_id }}>{{ gw.name }}</option>
-            {% endfor %}
-          </select>
-        </form>
+        {% for entry in completed_gameweeks %}
+          {% set gw = entry.gameweek %}
+          <details class="history-round" data-gw-id="{{ gw.id }}">
+            <summary class="history-round-summary">
+              <div class="history-round-info">
+                <span class="history-round-name">{{ gw.name }}</span>
+                <span class="history-round-dates">
+                  {% if entry.fixtures %}
+                    {% set first_ko = entry.fixtures[0].kickoff_at %}
+                    {% set last_ko = entry.fixtures[-1].kickoff_at %}
+                    {% if first_ko.date() == last_ko.date() %}
+                      {{ first_ko | london('%d %b %Y') }}
+                    {% else %}
+                      {{ first_ko | london('%d %b') }} &ndash; {{ last_ko | london('%d %b %Y') }}
+                    {% endif %}
+                  {% endif %}
+                </span>
+              </div>
+              <span class="history-round-winner">
+                {% if entry.winner %}<span class="winner-star">&#9733;</span> {{ entry.winner.display_name }}{% else %}No entrants{% endif %}
+              </span>
+            </summary>
 
-        {% if selected_gameweek_rows %}
-          <table class="lb-table">
-            <thead><tr><th>#</th><th>Player</th><th>Points</th></tr></thead>
-            <tbody>
-              {% for user, round_points, tournament_points in selected_gameweek_rows %}
-                <tr class="{{ 'is-me' if user.id == current_user.id }}">
-                  <td>{{ loop.index }}</td>
-                  <td>{{ user.display_name }}</td>
-                  <td>{{ round_points }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        {% else %}
-          <p class="leaderboard-muted">No one made predictions for this gameweek.</p>
-        {% endif %}
+            <div class="history-round-body">
+              {% if not entry.grid %}
+                <p class="leaderboard-muted">This gameweek has no fixtures.</p>
+              {% else %}
+
+              <div class="pgrid-outer" id="pgrid-outer-{{ gw.id }}" style="min-height: calc(3rem + {{ entry.fixtures|length }} * 3.5rem);">
+
+                <div class="pgrid-corner" id="pgrid-corner-{{ gw.id }}">Fixtures ({{ entry.fixtures|length }})</div>
+
+                <div class="pgrid-top" id="pgrid-top-{{ gw.id }}">
+                  <div class="pgrid-top-inner" id="pgrid-top-inner-{{ gw.id }}">
+                    {% for user in entry.users %}
+                    <div class="pgrid-user-cell" data-user-id="{{ user.id }}">
+                      <span class="user-name">{{ user.display_name }}</span>
+                      <span class="user-points">{{ entry.totals.get(user.id, 0) }}</span>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <div class="pgrid-left" id="pgrid-left-{{ gw.id }}">
+                  <div class="pgrid-left-inner" id="pgrid-left-inner-{{ gw.id }}">
+                    {% for row in entry.grid %}
+                    <div class="pgrid-fixture-cell fixture-cell" data-fixture-id="{{ row.fixture.id }}"{% if gw.is_locked %} data-live-url="{{ url_for('main.live_match', fixture_id=row.fixture.id) }}"{% endif %}>
+                      <div class="fixture-teams js-fixture-teams">
+                        {% if row.fixture.is_finished %}
+                          <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-result">{{ row.fixture.home_score }} &ndash; {{ row.fixture.away_score }}</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
+                        {% elif row.fixture.is_live %}
+                          {% set h = row.fixture.home_score if row.fixture.home_score is not none else 0 %}
+                          {% set a = row.fixture.away_score if row.fixture.away_score is not none else 0 %}
+                          <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="fixture-score-live">({{ h }}) &ndash; ({{ a }})</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
+                        {% else %}
+                          <img src="{{ row.fixture.home_crest_url }}" alt="" class="team-crest"> {{ row.fixture.home_short_name or row.fixture.home_team }} <span class="vs">v</span> {{ row.fixture.away_short_name or row.fixture.away_team }} <img src="{{ row.fixture.away_crest_url }}" alt="" class="team-crest">
+                        {% endif %}
+                      </div>
+                      <div class="fixture-meta js-fixture-meta" data-kickoff="{{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}">
+                        {% if row.fixture.is_finished %}
+                          <span class="fixture-ft">FT</span>
+                        {% elif row.fixture.status == 'PAUSED' %}
+                          <span class="live-badge live-badge-ht">HT</span>
+                        {% elif row.fixture.is_live_minute %}
+                          <span class="live-badge live-badge-live">{{ row.fixture.minute_display or 'LIVE' }}</span>
+                        {% else %}
+                          {{ row.fixture.kickoff_at | london('%a %d %b, %H:%M %Z') }}
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <div class="pgrid-body" id="pgrid-body-{{ gw.id }}">
+                  <div class="pgrid-body-inner" id="pgrid-body-inner-{{ gw.id }}">
+                  {% for row in entry.grid %}
+                  <div class="pgrid-body-row">
+                    {% for cell in row.cells %}
+                    <div class="score-cell{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
+                         data-fixture-id="{{ row.fixture.id }}"
+                         {% if cell.prediction %}data-predicted-home="{{ cell.prediction.predicted_home }}" data-predicted-away="{{ cell.prediction.predicted_away }}"{% endif %}>
+                      {% if cell.status == 'hidden' %}
+                        <span class="cell-icon clock-icon" title="Submitted &mdash; hidden until the gameweek locks">&#9201;</span>
+                      {% elif cell.status == 'no_pick' %}
+                        <span class="cell-empty" title="No prediction submitted">&ndash;</span>
+                      {% else %}
+                        <span class="cell-score">{{ cell.prediction.predicted_home }}&ndash;{{ cell.prediction.predicted_away }}</span>
+                      {% endif %}
+                    </div>
+                    {% endfor %}
+                  </div>
+                  {% endfor %}
+                  </div>{# /pgrid-body-inner #}
+                </div>
+
+              </div>
+              {% endif %}
+            </div>
+          </details>
+        {% endfor %}
       {% endif %}
     </div>
 
@@ -142,6 +219,182 @@
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  // Results tab: one four-panel grid per COMPLETE gameweek, initialised the first
+  // time its <details> section is expanded. Unlike the players/history grids,
+  // this one never scrolls vertically - the container is sized (via layout(),
+  // backstopped by an inline min-height) to fit every fixture row, so only
+  // horizontal dragging (to browse player columns) is wired up.
+  function initGrid(gwId) {
+    var outer     = document.getElementById('pgrid-outer-' + gwId);
+    var corner    = document.getElementById('pgrid-corner-' + gwId);
+    var topWrap   = document.getElementById('pgrid-top-' + gwId);
+    var topInner  = document.getElementById('pgrid-top-inner-' + gwId);
+    var leftWrap  = document.getElementById('pgrid-left-' + gwId);
+    var leftInner = document.getElementById('pgrid-left-inner-' + gwId);
+    var body      = document.getElementById('pgrid-body-' + gwId);
+    var bodyInner = document.getElementById('pgrid-body-inner-' + gwId);
+
+    if (!outer || !corner || !topWrap || !leftWrap || !body || !bodyInner) { return; }
+    if (outer.dataset.gridInit) { return; }
+    outer.dataset.gridInit = '1';
+
+    // --- Shared scroll state (horizontal only - see note above) ---
+    var scrollX = 0, maxScrollX = 0;
+
+    function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+    function updateTransforms() {
+      topInner.style.transform  = 'translateX(-' + scrollX + 'px)';
+      bodyInner.style.transform = 'translateX(-' + scrollX + 'px)';
+    }
+
+    // --- Layout: measure corner, position all four panels, grow the outer
+    // container to fit every row at its natural height (no stretching, no clip) ---
+    function layout() {
+      var cw = corner.offsetWidth;
+      var ch = corner.offsetHeight;
+
+      topWrap.style.left   = cw + 'px';
+      topWrap.style.height = ch + 'px';
+      leftWrap.style.top   = ch + 'px';
+      body.style.top       = ch + 'px';
+      body.style.left      = cw + 'px';
+
+      var fixCells = leftInner.children;
+      var bodyRows = bodyInner.children;
+      var i, n = Math.min(fixCells.length, bodyRows.length);
+      for (i = 0; i < n; i++) {
+        fixCells[i].style.height = '';
+        bodyRows[i].style.height = '';
+      }
+
+      var naturalRowHeight = 0;
+      for (i = 0; i < n; i++) {
+        naturalRowHeight = Math.max(naturalRowHeight, fixCells[i].offsetHeight, bodyRows[i].offsetHeight);
+      }
+      for (i = 0; i < n; i++) {
+        fixCells[i].style.height = naturalRowHeight + 'px';
+        bodyRows[i].style.height = naturalRowHeight + 'px';
+      }
+
+      // Grow the outer box to exactly fit header + every row - this (not a
+      // fixed/clamped height) is what guarantees zero vertical scrolling.
+      outer.style.height = (ch + n * naturalRowHeight) + 'px';
+
+      maxScrollX = Math.max(0, topInner.scrollWidth - topWrap.offsetWidth);
+      scrollX = clamp(scrollX, 0, maxScrollX);
+      updateTransforms();
+
+      outer.style.visibility = 'visible';
+    }
+
+    // --- Inertia / momentum (horizontal only) ---
+    var inertiaDx = 0, inertiaRaf = null;
+
+    function applyInertia() {
+      inertiaDx *= 0.97;
+      if (Math.abs(inertiaDx) < 0.5) { inertiaDx = 0; inertiaRaf = null; return; }
+      scrollX = clamp(scrollX + inertiaDx, 0, maxScrollX);
+      updateTransforms();
+      inertiaRaf = requestAnimationFrame(applyInertia);
+    }
+
+    function stopInertia() {
+      if (inertiaRaf) { cancelAnimationFrame(inertiaRaf); inertiaRaf = null; }
+      inertiaDx = 0;
+    }
+
+    // --- Horizontal touch scroll ---
+    function attachTouchScrollX(el) {
+      var startCoord = 0, startScroll = 0, lastCoord = 0, lastTime = 0, vel = 0;
+
+      el.addEventListener('touchstart', function (e) {
+        stopInertia();
+        var t = e.touches[0];
+        startCoord  = t.clientX;
+        startScroll = scrollX;
+        lastCoord   = startCoord;
+        lastTime    = Date.now();
+        vel         = 0;
+      }, { passive: true });
+
+      el.addEventListener('touchmove', function (e) {
+        var t     = e.touches[0];
+        var coord = t.clientX;
+        var now   = Date.now();
+        var dt    = now - lastTime;
+        if (dt > 0) { vel = (lastCoord - coord) / dt; }
+        lastCoord = coord;
+        lastTime  = now;
+        scrollX = clamp(startScroll + (startCoord - coord), 0, maxScrollX);
+        updateTransforms();
+      }, { passive: true });
+
+      el.addEventListener('touchend', function () {
+        inertiaDx = vel * 16;
+        if (Math.abs(inertiaDx) > 0.5) { inertiaRaf = requestAnimationFrame(applyInertia); }
+      }, { passive: true });
+
+      el.addEventListener('touchcancel', function () { vel = 0; }, { passive: true });
+    }
+
+    attachTouchScrollX(topWrap);
+    attachTouchScrollX(body);
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        var fixCells = leftInner.querySelectorAll('.pgrid-fixture-cell');
+        var maxW = 0;
+        for (var i = 0; i < fixCells.length; i++) {
+          var teamsEl = fixCells[i].querySelector('.fixture-teams');
+          if (!teamsEl) { continue; }
+          var cs = getComputedStyle(fixCells[i]);
+          var w = teamsEl.scrollWidth + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+          if (w > maxW) { maxW = w; }
+        }
+        if (maxW > 0) {
+          outer.style.setProperty('--pgrid-fix-w', (maxW + 8) + 'px');
+        }
+
+        layout();
+
+        if (corner.offsetWidth === 0 || corner.offsetHeight === 0) {
+          setTimeout(layout, 100);
+        }
+
+        var resizePending = false;
+        function onResize() {
+          if (resizePending) { return; }
+          resizePending = true;
+          requestAnimationFrame(function () { resizePending = false; layout(); });
+        }
+        window.addEventListener('resize', onResize, { passive: true });
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', onResize, { passive: true });
+        }
+        if (window.ResizeObserver) {
+          new ResizeObserver(onResize).observe(outer);
+        }
+      });
+    });
+  }
+
+  // Exclusive expand: opening one gameweek's section closes any other that was open.
+  var resultRounds = document.querySelectorAll('#lb-results .history-round');
+  resultRounds.forEach(function (details) {
+    details.addEventListener('toggle', function () {
+      if (!details.open) { return; }
+      initGrid(details.dataset.gwId);
+      resultRounds.forEach(function (other) {
+        if (other !== details && other.open) { other.open = false; }
+      });
+    });
+  });
+})();
+</script>
 
 <style>
   body.leaderboard-body {
@@ -255,21 +508,300 @@
     color: var(--text-muted);
   }
 
-  .lb-gw-select-form {
-    margin: 0.75rem 0;
-  }
-  .lb-gw-select {
-    width: 100%;
-    background: #000;
-    color: #e9ecef;
+  /* ---- Results tab: collapsible per-gameweek sections (copied from history.html) ---- */
+
+  .history-round {
+    background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 0.4rem;
-    padding: 0.5rem 0.6rem;
-    font-size: 0.9rem;
+    border-radius: 0.6rem;
+    margin-bottom: 0.6rem;
+    overflow: hidden;
   }
-  .lb-gw-select:focus {
-    outline: none;
-    border-color: var(--accent);
+  .history-round-summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.65rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .history-round-summary::-webkit-details-marker {
+    display: none;
+  }
+  .history-round-summary::after {
+    content: '\25BE';
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    transition: transform 0.15s ease;
+    flex: 0 0 auto;
+  }
+  .history-round[open] > .history-round-summary::after {
+    transform: rotate(180deg);
+  }
+  .history-round-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+  .history-round-name {
+    font-weight: 700;
+    color: #fff;
+    font-size: 1rem;
+  }
+  .history-round-dates {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .history-round-winner {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+    text-align: right;
+  }
+  .history-round-body {
+    border-top: 1px solid var(--border);
+    padding: 0.75rem 1rem 1rem;
+  }
+
+  /* ---- Four-panel JS-sync grid (copied from players.html/history.html) ----
+     Unlike those two, this grid never scrolls vertically: height is auto,
+     sized to fit every fixture row (see layout() in the script above), and
+     pgrid-body/pgrid-left have overflow-y: hidden rather than a clipped,
+     scrollable box - only horizontal dragging (player columns) is enabled. */
+
+  .pgrid-outer {
+    position: relative;
+    width: 100%;
+    height: auto;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: #181b20;
+    box-sizing: border-box;
+    visibility: hidden;
+    --pgrid-fix-w: 10rem;
+    --pgrid-col-w: 4.5rem;
+  }
+
+  .pgrid-outer, .pgrid-outer * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .pgrid-corner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 4;
+    width: var(--pgrid-fix-w);
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 0.5rem 0.6rem;
+    background: var(--panel);
+    border-right: 1px solid var(--border-alt);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .pgrid-top {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    overflow: hidden;
+    background: var(--panel);
+  }
+
+  .pgrid-top-inner {
+    display: flex;
+    will-change: transform;
+  }
+
+  .pgrid-user-cell {
+    flex-shrink: 0;
+    width: var(--pgrid-col-w);
+    height: 3rem;
+    box-sizing: border-box;
+    padding: 0.35rem 0.4rem;
+    border-right: 1px solid var(--border-alt);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+  }
+
+  .pgrid-left {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    z-index: 3;
+    overflow: hidden;
+    overflow-y: hidden;
+    width: var(--pgrid-fix-w);
+    border-top: 1px solid var(--border-alt);
+  }
+
+  .pgrid-left-inner {
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+  }
+
+  .pgrid-fixture-cell {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    width: var(--pgrid-fix-w);
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--border-alt);
+    border-right: 1px solid var(--border-alt);
+    background: var(--panel);
+    text-align: left;
+  }
+  .pgrid-fixture-cell[data-live-url] {
+    cursor: pointer;
+  }
+  .pgrid-fixture-cell[data-live-url]:active {
+    background: var(--panel-alt);
+  }
+
+  .pgrid-body {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    overflow-y: hidden;
+    z-index: 1;
+    border-top: 1px solid var(--border-alt);
+  }
+
+  .pgrid-body-inner {
+    will-change: transform;
+  }
+
+  .pgrid-body-row {
+    display: flex;
+    align-items: stretch;
+  }
+
+  .user-name {
+    display: block;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #e9ecef;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(var(--pgrid-col-w) - 0.8rem);
+  }
+  .user-points {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .fixture-teams {
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+  .team-crest {
+    height: 1rem;
+    width: 1rem;
+    object-fit: contain;
+    vertical-align: -0.2rem;
+  }
+  .fixture-teams .vs {
+    color: #6c757d;
+    font-weight: 400;
+  }
+  .fixture-meta {
+    margin-top: 0.15rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .fixture-score-result {
+    font-weight: 700;
+    color: #e9ecef;
+  }
+  .fixture-score-live {
+    font-weight: 700;
+    color: var(--status-wrong);
+  }
+  .fixture-ft {
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.04em;
+  }
+  .live-badge {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .live-badge-live {
+    color: var(--status-correct);
+  }
+  .live-badge-ht {
+    color: var(--status-pending);
+  }
+
+  .score-cell {
+    flex-shrink: 0;
+    width: var(--pgrid-col-w);
+    box-sizing: border-box;
+    padding: 0.45rem 0.4rem;
+    border-bottom: 1px solid var(--border-alt);
+    border-right: 1px solid var(--border-alt);
+    background: #181b20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    position: relative;
+  }
+  .cell-score {
+    font-weight: 600;
+    color: #fff;
+  }
+  .score-cell.pred-wrong .cell-score {
+    color: #adb5bd;
+    font-weight: 400;
+  }
+  .score-cell.pred-correct .cell-score {
+    color: #74c69d;
+  }
+  .score-cell.pred-exact .cell-score {
+    color: #ffd166;
+    font-weight: 700;
+  }
+  .cell-empty {
+    color: #5a626c;
+  }
+  .cell-icon {
+    margin-left: 0.3rem;
+  }
+  .clock-icon {
+    color: var(--status-hidden);
+  }
+
+  @media (min-width: 768px) {
+    .pgrid-outer {
+      --pgrid-col-w: 5rem;
+    }
+    .fixture-teams {
+      font-size: 0.82rem;
+    }
   }
 
   .lb-stats-scroll {

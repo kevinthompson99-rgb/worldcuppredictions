@@ -124,12 +124,10 @@ def players():
     )
 
 
-@bp.route("/history")
-@login_required
-def history():
-    """Read-only archive of every COMPLETE gameweek, most recent first - each one
-    browsable as the same predictions grid shown on the live players screen (see
-    main.players), collapsed by default on the template side.
+def _completed_gameweek_rounds():
+    """List of {"gameweek", "fixtures", "users", "grid", "totals", "winner"} dicts,
+    one per COMPLETE gameweek (most recent first) - the read-only archive grid
+    shared by main.history and the leaderboard's Results tab.
     """
     completed_gameweeks = (
         Gameweek.query.filter_by(status=GAMEWEEK_STATUS_COMPLETE).order_by(Gameweek.matchday.desc()).all()
@@ -153,7 +151,17 @@ def history():
             "winner": winner,
         })
 
-    return render_template("main/history.html", rounds=rounds)
+    return rounds
+
+
+@bp.route("/history")
+@login_required
+def history():
+    """Read-only archive of every COMPLETE gameweek, most recent first - each one
+    browsable as the same predictions grid shown on the live players screen (see
+    main.players), collapsed by default on the template side.
+    """
+    return render_template("main/history.html", rounds=_completed_gameweek_rounds())
 
 
 @bp.route("/gameweek/opt-in", methods=["POST"])
@@ -277,22 +285,11 @@ def _stats_rows():
 def leaderboard():
     """The dedicated leaderboard screen: this gameweek's pot standings (opted-in
     players only, with each one's financial result), the season-long table
-    (cumulative points and running balance for everyone who's taken part), a
-    by-gameweek breakdown for any COMPLETE gameweek, and season-wide prediction
-    accuracy stats.
+    (cumulative points and running balance for everyone who's taken part), the
+    full Results archive (every COMPLETE gameweek's predictions grid), and
+    season-wide prediction accuracy stats.
     """
     gameweek = get_gameweek_for_leaderboard()
-
-    completed_gameweeks = (
-        Gameweek.query.filter_by(status=GAMEWEEK_STATUS_COMPLETE).order_by(Gameweek.matchday.asc()).all()
-    )
-
-    # ?gw=<id> picks which completed gameweek the "By Gameweek" tab shows - falls
-    # back to the most recent one if absent or invalid (not a COMPLETE gameweek).
-    requested_gameweek_id = request.args.get("gw", type=int)
-    selected_gameweek = next((gw for gw in completed_gameweeks if gw.id == requested_gameweek_id), None)
-    if selected_gameweek is None and completed_gameweeks:
-        selected_gameweek = completed_gameweeks[-1]
 
     return render_template(
         "main/leaderboard.html",
@@ -302,13 +299,8 @@ def leaderboard():
         current_gameweek_number=gameweek.matchday if gameweek is not None else None,
         financial_summary=gameweek_financial_summary(gameweek) if gameweek is not None else None,
         season_financial_rows=season_financial_table(),
-        completed_gameweeks=completed_gameweeks,
-        selected_gameweek_id=selected_gameweek.id if selected_gameweek is not None else None,
-        selected_gameweek_rows=gameweek_leaderboard(selected_gameweek) if selected_gameweek is not None else [],
+        completed_gameweeks=_completed_gameweek_rounds(),
         stats_rows=_stats_rows(),
-        # Which tab renders "active" on load - only meaningful when the page was
-        # reached via the gameweek dropdown's own GET reload (?gw=<id>).
-        active_tab="gameweek" if requested_gameweek_id is not None else "round",
     )
 
 
