@@ -6,7 +6,7 @@ row/cell structure and colour-coding rules are identical, so it's built once
 here rather than duplicated per route.
 """
 
-from app.models import Prediction
+from app.models import GAMEWEEK_STATUS_COMPLETE, Prediction
 from app.scoring import POINTS_EXACT_SCORE
 
 
@@ -37,9 +37,37 @@ def _cell(user, prediction, fixture, locked):
     return {"user_id": user.id, "fixture_id": fixture.id, "prediction": prediction, "status": status}
 
 
+def _sort_users_by_gameweek_result(users, predictions):
+    """Order `users` in place by this gameweek's own result: total points scored
+    descending, exact scores as the tiebreaker, then name - so a COMPLETE
+    gameweek's grid reads left-to-right as its own mini leaderboard, winner first.
+
+    `predictions` is build_grid's own {(user_id, fixture_id): Prediction} map,
+    already scoped to this gameweek's fixtures.
+    """
+    points_by_user = {}
+    exact_by_user = {}
+    for (user_id, _fixture_id), prediction in predictions.items():
+        points_by_user[user_id] = points_by_user.get(user_id, 0) + (prediction.points or 0)
+        if prediction.points == POINTS_EXACT_SCORE:
+            exact_by_user[user_id] = exact_by_user.get(user_id, 0) + 1
+
+    users.sort(key=lambda user: (
+        -points_by_user.get(user.id, 0),
+        -exact_by_user.get(user.id, 0),
+        user.display_name,
+    ))
+
+
 def build_grid(gameweek, users):
     """List of {"fixture": Fixture, "cells": [...]} rows for a gameweek's read-only
     predictions grid - one row per fixture, one cell per user in `users`.
+
+    For a COMPLETE gameweek, `users` is re-sorted in place by that gameweek's own
+    result before the columns are built (see _sort_users_by_gameweek_result) - the
+    caller's `users` list is the same object handed to the template for the header
+    row, so both stay in sync automatically. A gameweek that isn't COMPLETE yet
+    (e.g. the live active one) keeps whatever order the caller passed in.
     """
     fixtures = gameweek.fixtures.all()
     locked = gameweek.is_locked
@@ -49,6 +77,9 @@ def build_grid(gameweek, users):
         fixture_ids = [fixture.id for fixture in fixtures]
         for prediction in Prediction.query.filter(Prediction.fixture_id.in_(fixture_ids)):
             predictions[(prediction.user_id, prediction.fixture_id)] = prediction
+
+    if gameweek.status == GAMEWEEK_STATUS_COMPLETE:
+        _sort_users_by_gameweek_result(users, predictions)
 
     return [
         {

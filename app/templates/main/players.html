@@ -110,6 +110,7 @@
             {% for cell in row.cells %}
             <div class="score-cell{{ ' pred-exact' if cell.status == 'exact' }}{{ ' pred-correct' if cell.status == 'correct' }}{{ ' pred-wrong' if cell.status == 'wrong' }}"
                  data-fixture-id="{{ row.fixture.id }}"
+                 data-user-id="{{ cell.user_id }}"
                  {% if cell.prediction %}data-predicted-home="{{ cell.prediction.predicted_home }}" data-predicted-away="{{ cell.prediction.predicted_away }}"{% endif %}>
               {% if cell.status == 'hidden' %}
                 <span class="cell-icon clock-icon" title="Submitted &mdash; hidden until the gameweek locks">&#9201;</span>
@@ -267,6 +268,47 @@ var matchCountdown = (function () {
         console.log('[updateTotals] updating uid', uid, 'from', pointsEl.textContent, 'to', totals[uid]);
         pointsEl.textContent = totals[uid];
       }
+    });
+    reorderColumnsByPoints();
+  }
+
+  // Live re-ranking: once every user-cell's points are up to date, re-sort the
+  // header columns by points (descending, ties keep their existing left-to-right
+  // order - a stable sort) and move each pgrid-body-row's score-cells to match,
+  // via the data-user-id every score-cell carries (see players.html's Jinja
+  // markup). Body cells are positional, not user-tagged in their own right, so
+  // the header's new column order is the map the body rows reorder against.
+  function reorderColumnsByPoints() {
+    var topInner = document.getElementById('pgrid-top-inner');
+    if (!topInner) { return; }
+    var userCells = Array.prototype.slice.call(topInner.querySelectorAll('.pgrid-user-cell[data-user-id]'));
+    if (!userCells.length) { return; }
+
+    var ordered = userCells
+      .map(function (cell, index) {
+        var pointsEl = cell.querySelector('.user-points');
+        var points = pointsEl ? parseInt(pointsEl.textContent, 10) : 0;
+        return { cell: cell, userId: cell.dataset.userId, points: isNaN(points) ? 0 : points, index: index };
+      })
+      .sort(function (a, b) {
+        if (b.points !== a.points) { return b.points - a.points; }
+        return a.index - b.index; // stable: unchanged relative order on ties
+      });
+
+    // appendChild on an already-attached node moves it - repeating that in the
+    // sorted order re-lays out the whole row without touching/recreating any cell.
+    ordered.forEach(function (entry) { topInner.appendChild(entry.cell); });
+
+    var columnOrder = ordered.map(function (entry) { return entry.userId; });
+    document.querySelectorAll('.pgrid-body-row').forEach(function (row) {
+      var cellsByUser = {};
+      row.querySelectorAll('.score-cell[data-user-id]').forEach(function (cell) {
+        cellsByUser[cell.dataset.userId] = cell;
+      });
+      columnOrder.forEach(function (userId) {
+        var cell = cellsByUser[userId];
+        if (cell) { row.appendChild(cell); }
+      });
     });
   }
 
