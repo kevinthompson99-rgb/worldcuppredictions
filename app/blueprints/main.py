@@ -13,8 +13,9 @@ from app.finance import (
 )
 from app.forms import CSRFForm
 from app.leaderboards import gameweek_leaderboard
-from app.models import Fixture, GameweekEntry, Prediction, PushSubscription, User
+from app.models import Fixture, GAMEWEEK_STATUS_COMPLETE, Gameweek, GameweekEntry, Prediction, PushSubscription, User
 from app.gameweek_helpers import get_active_gameweek, get_gameweek_for_leaderboard
+from app.round_helpers import build_grid
 from app.scoring import calculate_points, POINTS_CORRECT_RESULT, POINTS_EXACT_SCORE
 
 bp = Blueprint("main", __name__)
@@ -30,35 +31,6 @@ _AVATAR_COLORS = (
 def _avatar(user):
     initials = user.display_name[:2].upper() if len(user.display_name) > 1 else user.display_name[:1].upper()
     return {"initials": initials, "color": _AVATAR_COLORS[user.id % len(_AVATAR_COLORS)]}
-
-
-def _cell(user, prediction, fixture, locked, is_me):
-    """Build the per-(user, fixture) cell the read-only players grid renders.
-
-    `status` drives both the icon and highlight, and is one of:
-      hidden   - gameweek hasn't locked yet, so this prediction is concealed (own
-                 included - the dedicated My Predictions screen is where a user
-                 reviews/edits their own picks before the deadline)
-      no_pick  - gameweek has locked and this user never made a prediction
-      pending  - gameweek has locked, prediction is visible, but the fixture has no score yet
-      wrong    - scored 0 against the current/final score (wrong result)
-      correct  - scored the correct-result points against the current/final score (not exact)
-      exact    - matches the current/final score exactly
-    """
-    if not locked:
-        status = "hidden"
-    elif prediction is None:
-        status = "no_pick"
-    elif prediction.points is None:
-        status = "pending"
-    elif prediction.points == POINTS_EXACT_SCORE:
-        status = "exact"
-    elif prediction.points:
-        status = "correct"
-    else:
-        status = "wrong"
-
-    return {"user_id": user.id, "fixture_id": fixture.id, "prediction": prediction, "status": status}
 
 
 @bp.route("/sw.js")
@@ -118,22 +90,7 @@ def players():
         # alphabetically (the query above already sorts by display_name).
         users.sort(key=lambda user: user.id != current_user.id)
 
-    predictions = {}
-    if fixtures:
-        fixture_ids = [fixture.id for fixture in fixtures]
-        for prediction in Prediction.query.filter(Prediction.fixture_id.in_(fixture_ids)):
-            predictions[(prediction.user_id, prediction.fixture_id)] = prediction
-
-    grid = [
-        {
-            "fixture": fixture,
-            "cells": [
-                _cell(user, predictions.get((user.id, fixture.id)), fixture, locked, user.id == current_user.id)
-                for user in users
-            ],
-        }
-        for fixture in fixtures
-    ]
+    grid = build_grid(gameweek, users) if gameweek is not None else []
 
     standings = gameweek_leaderboard(gameweek) if gameweek is not None else []
 
@@ -164,6 +121,38 @@ def players():
         has_live_fixtures=has_live_fixtures,
         live_fixture_ids=live_fixture_ids,
     )
+
+
+@bp.route("/history")
+@login_required
+def history():
+    """Read-only archive of every COMPLETE gameweek, most recent first - each one
+    browsable as the same predictions grid shown on the live players screen (see
+    main.players), collapsed by default on the template side.
+    """
+    completed_gameweeks = (
+        Gameweek.query.filter_by(status=GAMEWEEK_STATUS_COMPLETE).order_by(Gameweek.matchday.desc()).all()
+    )
+
+    rounds = []
+    for gameweek in completed_gameweeks:
+        fixtures = gameweek.fixtures.all()
+        entrant_ids = {entry.user_id for entry in gameweek.entries.filter_by(opted_in=True)}
+        users = [user for user in User.query.order_by(User.display_name.asc()).all() if user.id in entrant_ids]
+
+        standings = [row for row in gameweek_leaderboard(gameweek) if row[0].id in entrant_ids]
+        winner = standings[0][0] if standings else None
+
+        rounds.append({
+            "gameweek": gameweek,
+            "fixtures": fixtures,
+            "users": users,
+            "grid": build_grid(gameweek, users),
+            "totals": {user.id: gameweek_points for user, gameweek_points, season_points in standings},
+            "winner": winner,
+        })
+
+    return render_template("main/history.html", rounds=rounds)
 
 
 @bp.route("/gameweek/opt-in", methods=["POST"])
