@@ -3,6 +3,7 @@ from datetime import datetime
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import func
 
 from app.extensions import db
 from app.finance import (
@@ -194,20 +195,117 @@ def dashboard():
     return redirect(url_for("main.players"))
 
 
+def _stats_rows():
+    """Per-user prediction accuracy across every COMPLETE gameweek: exact-score and
+    correct-result counts, plus each user's best and worst single-gameweek points
+    total. Only includes users who've made at least one prediction in a COMPLETE
+    gameweek. Ordered by exact scores desc, then correct results desc, then name.
+    """
+    per_gameweek_points = (
+        db.session.query(
+            Prediction.user_id.label("user_id"),
+            Fixture.gameweek_id.label("gameweek_id"),
+            func.sum(Prediction.points).label("points"),
+        )
+        .join(Fixture, Fixture.id == Prediction.fixture_id)
+        .join(Gameweek, Gameweek.id == Fixture.gameweek_id)
+        .filter(Gameweek.status == GAMEWEEK_STATUS_COMPLETE)
+        .group_by(Prediction.user_id, Fixture.gameweek_id)
+        .subquery()
+    )
+    best_worst = (
+        db.session.query(
+            per_gameweek_points.c.user_id.label("user_id"),
+            func.max(per_gameweek_points.c.points).label("best_gw"),
+            func.min(per_gameweek_points.c.points).label("worst_gw"),
+        )
+        .group_by(per_gameweek_points.c.user_id)
+        .subquery()
+    )
+    exact_counts = (
+        db.session.query(
+            Prediction.user_id.label("user_id"),
+            func.count(Prediction.id).label("exact_scores"),
+        )
+        .join(Fixture, Fixture.id == Prediction.fixture_id)
+        .join(Gameweek, Gameweek.id == Fixture.gameweek_id)
+        .filter(Gameweek.status == GAMEWEEK_STATUS_COMPLETE, Prediction.points == POINTS_EXACT_SCORE)
+        .group_by(Prediction.user_id)
+        .subquery()
+    )
+    correct_counts = (
+        db.session.query(
+            Prediction.user_id.label("user_id"),
+            func.count(Prediction.id).label("correct_results"),
+        )
+        .join(Fixture, Fixture.id == Prediction.fixture_id)
+        .join(Gameweek, Gameweek.id == Fixture.gameweek_id)
+        .filter(Gameweek.status == GAMEWEEK_STATUS_COMPLETE, Prediction.points == POINTS_CORRECT_RESULT)
+        .group_by(Prediction.user_id)
+        .subquery()
+    )
+
+    rows = (
+        db.session.query(
+            User,
+            func.coalesce(exact_counts.c.exact_scores, 0).label("exact_scores"),
+            func.coalesce(correct_counts.c.correct_results, 0).label("correct_results"),
+            best_worst.c.best_gw,
+            best_worst.c.worst_gw,
+        )
+        .join(best_worst, best_worst.c.user_id == User.id)
+        .outerjoin(exact_counts, exact_counts.c.user_id == User.id)
+        .outerjoin(correct_counts, correct_counts.c.user_id == User.id)
+        .order_by(db.desc("exact_scores"), db.desc("correct_results"), User.display_name.asc())
+        .all()
+    )
+
+    return [
+        {
+            "user": user,
+            "exact_scores": exact_scores,
+            "correct_results": correct_results,
+            "best_gw": best_gw,
+            "worst_gw": worst_gw,
+        }
+        for user, exact_scores, correct_results, best_gw, worst_gw in rows
+    ]
+
+
 @bp.route("/leaderboard")
 @login_required
 def leaderboard():
     """The dedicated leaderboard screen: this gameweek's pot standings (opted-in
-    players only, with each one's financial result) plus the season-long table
-    (cumulative points and running balance for everyone who's taken part).
+    players only, with each one's financial result), the season-long table
+    (cumulative points and running balance for everyone who's taken part), a
+    by-gameweek breakdown for any COMPLETE gameweek, and season-wide prediction
+    accuracy stats.
     """
     gameweek = get_gameweek_for_leaderboard()
+
+    completed_gameweeks = (
+        Gameweek.query.filter_by(status=GAMEWEEK_STATUS_COMPLETE).order_by(Gameweek.matchday.asc()).all()
+    )
+
+    # ?gw=<id> picks which completed gameweek the "By Gameweek" tab shows - falls
+    # back to the most recent one if absent or invalid (not a COMPLETE gameweek).
+    requested_gameweek_id = request.args.get("gw", type=int)
+    selected_gameweek = next((gw for gw in completed_gameweeks if gw.id == requested_gameweek_id), None)
+    if selected_gameweek is None and completed_gameweeks:
+        selected_gameweek = completed_gameweeks[-1]
 
     return render_template(
         "main/leaderboard.html",
         gameweek=gameweek,
         financial_summary=gameweek_financial_summary(gameweek) if gameweek is not None else None,
         season_financial_rows=season_financial_table(),
+        completed_gameweeks=completed_gameweeks,
+        selected_gameweek_id=selected_gameweek.id if selected_gameweek is not None else None,
+        selected_gameweek_rows=gameweek_leaderboard(selected_gameweek) if selected_gameweek is not None else [],
+        stats_rows=_stats_rows(),
+        # Which tab renders "active" on load - only meaningful when the page was
+        # reached via the gameweek dropdown's own GET reload (?gw=<id>).
+        active_tab="gameweek" if requested_gameweek_id is not None else "round",
     )
 
 
