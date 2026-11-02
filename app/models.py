@@ -332,3 +332,31 @@ class PushSubscription(db.Model):
 
     def __repr__(self):
         return f"<PushSubscription user={self.user_id} endpoint={self.endpoint[:40]}...>"
+
+
+class Notification(db.Model):
+    """One in-app inbox entry per recipient (see app/push.py). The push banner carries
+    `short_body`; `full_body` is the untruncated text shown on /notifications/<id>.
+    `url` is where the notification's "Open" button leads (the page the push used to
+    open directly); `read_at` stays null until the recipient opens the detail page.
+    """
+
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    short_body = db.Column(db.String(100), nullable=False)
+    full_body = db.Column(db.Text, nullable=False)
+    url = db.Column(db.String(500), nullable=False, default="/")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    read_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship("User", backref=db.backref("notifications", lazy="dynamic", cascade="all, delete-orphan"))
+
+    @property
+    def is_unread(self):
+        return self.read_at is None
+
+    def __repr__(self):
+        return f"<Notification id={self.id} user={self.user_id} {self.title!r}>"

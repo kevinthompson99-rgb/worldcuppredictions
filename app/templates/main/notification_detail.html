@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ notification.title }}{% endblock %}
+{% block body_class %}inbox-body{% endblock %}
+{% block content %}
+<div class="inbox-page">
+  <div class="inbox-head">
+    <a class="inbox-link" href="{{ url_for('main.notifications') }}">&larr; All notifications</a>
+  </div>
+
+  <div class="inbox-card">
+    <h1 class="inbox-h1">{{ notification.title }}</h1>
+    <p class="inbox-meta">{{ notification.created_at | london('%a %d %b, %H:%M') }}</p>
+    <p class="inbox-full">{{ notification.full_body }}</p>
+    {% if notification.url and notification.url != '/' %}
+    <a class="btn btn-accent btn-lg inbox-open" href="{{ notification.url }}">Open</a>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+  body.inbox-body { background: var(--bg); }
+  body.inbox-body .navbar, body.inbox-body footer { background-color: var(--bg) !important; }
+  .inbox-page { color: #e9ecef; max-width: 40rem; margin: 0 auto; }
+  .inbox-head { margin-bottom: 0.75rem; }
+  .inbox-h1 { color: #fff; font-size: 1.4rem; margin: 0 0 0.25rem; }
+  .inbox-link { color: var(--text-muted); font-size: 0.8rem; text-decoration: none; }
+  .inbox-link:hover { color: #fff; }
+  .inbox-card { background: var(--panel); border: 1px solid var(--border); border-radius: 0.6rem; padding: 1rem; }
+  .inbox-meta { color: var(--text-muted); font-size: 0.8rem; margin: 0 0 1rem; }
+  .inbox-full { color: #e9ecef; font-size: 0.95rem; white-space: pre-line; overflow-wrap: anywhere; }
+  .inbox-open { display: block; width: 100%; max-width: 24rem; margin: 1.25rem auto 0; text-align: center; }
+</style>
+{% endblock %}

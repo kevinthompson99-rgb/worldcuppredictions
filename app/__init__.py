@@ -370,6 +370,18 @@ def register_template_helpers(app):
         return {"apple_icon_data_uri": apple_icon_data_uri}
 
     @app.context_processor
+    def inject_unread_notifications():
+        from flask_login import current_user
+
+        from app.models import Notification
+
+        if not current_user.is_authenticated:
+            return {"unread_notifications": 0}
+        return {
+            "unread_notifications": Notification.query.filter_by(user_id=current_user.id, read_at=None).count()
+        }
+
+    @app.context_processor
     def inject_now():
         return {"current_year": datetime.utcnow().year, "app_version": app.config["APP_VERSION"]}
 

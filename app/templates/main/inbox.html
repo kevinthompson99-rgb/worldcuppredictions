@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block body_class %}inbox-body{% endblock %}
+{% block content %}
+<div class="inbox-page">
+  <div class="inbox-head">
+    <h1 class="inbox-h1">Notifications</h1>
+    <a class="inbox-link" href="{{ url_for('main.notification_settings') }}">Push settings</a>
+  </div>
+
+  {% if notifications %}
+  <div class="inbox-list">
+    {% for item in notifications %}
+    <a class="inbox-item{% if item.is_unread %} is-unread{% endif %}" href="{{ url_for('main.notification_detail', notification_id=item.id) }}">
+      <span class="inbox-dot" aria-hidden="true"></span>
+      <span class="inbox-text">
+        <span class="inbox-title">{{ item.title }}</span>
+        <span class="inbox-short">{{ item.short_body }}</span>
+        <span class="inbox-meta">{{ item.created_at | london('%a %d %b, %H:%M') }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="inbox-card">
+    <p class="inbox-meta">No notifications yet. Reminders, results and gameweek updates will appear here.</p>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  body.inbox-body { background: var(--bg); }
+  body.inbox-body .navbar, body.inbox-body footer { background-color: var(--bg) !important; }
+  .inbox-page { color: #e9ecef; max-width: 40rem; margin: 0 auto; }
+  .inbox-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.75rem; }
+  .inbox-h1 { color: #fff; font-size: 1.4rem; margin: 0; }
+  .inbox-link { color: var(--text-muted); font-size: 0.8rem; text-decoration: none; }
+  .inbox-link:hover { color: #fff; }
+  .inbox-card, .inbox-item { background: var(--panel); border: 1px solid var(--border); border-radius: 0.6rem; padding: 1rem; }
+  .inbox-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .inbox-item { display: flex; gap: 0.75rem; align-items: flex-start; color: inherit; text-decoration: none; }
+  .inbox-item:hover { border-color: var(--accent); color: inherit; }
+  .inbox-dot { flex: 0 0 0.6rem; width: 0.6rem; height: 0.6rem; margin-top: 0.4rem; border-radius: 50%; background: transparent; }
+  .inbox-item.is-unread { border-left: 3px solid var(--accent); }
+  .inbox-item.is-unread .inbox-dot { background: var(--accent); }
+  .inbox-text { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+  .inbox-title { color: #fff; font-size: 0.95rem; font-weight: 600; }
+  .inbox-item:not(.is-unread) .inbox-title { font-weight: 400; color: #ced4da; }
+  .inbox-short { color: #ced4da; font-size: 0.95rem; overflow-wrap: anywhere; }
+  .inbox-meta { color: var(--text-muted); font-size: 0.8rem; margin: 0; }
+</style>
+{% endblock %}

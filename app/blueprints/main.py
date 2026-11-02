@@ -14,7 +14,7 @@ from app.finance import (
 )
 from app.forms import CSRFForm
 from app.leaderboards import gameweek_leaderboard
-from app.models import Fixture, GAMEWEEK_STATUS_COMPLETE, Gameweek, GameweekEntry, Prediction, PushSubscription, User
+from app.models import Fixture, GAMEWEEK_STATUS_COMPLETE, Gameweek, GameweekEntry, Notification, Prediction, PushSubscription, User
 from app.gameweek_helpers import get_active_gameweek, get_gameweek_for_leaderboard
 from app.round_helpers import build_grid
 from app.scoring import calculate_points, POINTS_CORRECT_RESULT, POINTS_EXACT_SCORE
@@ -438,10 +438,37 @@ def scores_live():
 @bp.route("/notifications")
 @login_required
 def notifications():
+    items = (
+        Notification.query.filter_by(user_id=current_user.id)
+        .order_by(Notification.created_at.desc(), Notification.id.desc())
+        .all()
+    )
+    return render_template("main/inbox.html", notifications=items)
+
+
+@bp.route("/notifications/unread-count")
+@login_required
+def notifications_unread_count():
+    return jsonify(count=Notification.query.filter_by(user_id=current_user.id, read_at=None).count())
+
+
+@bp.route("/notifications/settings")
+@login_required
+def notification_settings():
     return render_template(
         "main/notifications.html",
         vapid_public_key=os.environ.get("VAPID_PUBLIC_KEY", ""),
     )
+
+
+@bp.route("/notifications/<int:notification_id>")
+@login_required
+def notification_detail(notification_id):
+    notification = Notification.query.filter_by(id=notification_id, user_id=current_user.id).first_or_404()
+    if notification.read_at is None:
+        notification.read_at = datetime.utcnow()
+        db.session.commit()
+    return render_template("main/notification_detail.html", notification=notification)
 
 
 @bp.route("/push/subscribe", methods=["POST"])

@@ -1,6 +1,6 @@
 // Bump this on every deploy that changes the cached shell — a byte-for-byte
 // diff in this file is what makes the browser notice an update is available.
-const CACHE_NAME = "leprem-shell-v3";
+const CACHE_NAME = "leprem-shell-v4";
 
 const APP_SHELL_URLS = [
   "/static/manifest.json",
@@ -82,7 +82,7 @@ self.addEventListener("push", function(event) {
     body: payload.body || "",
     icon: "/static/icons/icon-192.png",
     badge: "/static/icons/icon-192.png",
-    data: { url: payload.url || "/" }
+    data: { url: payload.url || "/", notification_id: payload.notification_id || null }
   };
 
   // The app's home-screen icon badge (the little red counter) is a separate API
@@ -108,10 +108,10 @@ self.addEventListener("push", function(event) {
 
 self.addEventListener("notificationclick", function(event) {
   event.notification.close();
-  if ("clearAppBadge" in self.navigator) {
-    self.navigator.clearAppBadge().catch(function () {});
-  }
-  var url = event.notification.data.url;
+  // The page sets the icon badge to the real unread count once it loads, so it is
+  // not cleared here.
+  var data = event.notification.data || {};
+  var url = new URL(data.url || "/", self.location.origin).href;
   // clients.openWindow() alone often just re-focuses an already-open PWA window on
   // iOS instead of navigating it - explicitly find an existing window and navigate
   // it first, falling back to opening a new one only if none is open.
