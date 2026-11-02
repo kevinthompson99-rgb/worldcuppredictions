@@ -22,6 +22,14 @@
     .nav-bell-badge { display: inline-block; min-width: 1.25rem; padding: 0 0.3rem; border-radius: 0.6rem;
       background: var(--status-wrong, #ff6b6b); color: #fff; font-size: 0.8rem; line-height: 1.25rem; text-align: center; }
     .nav-bell-badge[hidden] { display: none; }
+    /* Below the lg breakpoint (where the nav collapses into the burger) the bell sits in
+       the header itself, immediately left of the burger. The badge is overlaid on the
+       icon corner so it appearing or disappearing never shifts the header layout. */
+    .nav-bell-mobile { position: relative; justify-content: center; min-width: 44px; min-height: 44px;
+      margin-left: auto; margin-right: max(0.5rem, env(safe-area-inset-right));
+      color: var(--bs-navbar-color); text-decoration: none; }
+    .nav-bell-mobile:hover, .nav-bell-mobile:focus { color: var(--bs-navbar-hover-color); }
+    .nav-bell-mobile .nav-bell-badge { position: absolute; top: 2px; right: -2px; }
     /* Moving the dark body background into <head> (render-blocking) eliminates the
        white flash on iOS PWA when navigating between dark-themed screens. Without
        this, Bootstrap's body{background:#fff} wins the first paint, then the
@@ -48,6 +56,10 @@
     }
   </style>
 </head>
+{% macro bell_link(extra_class) %}<a class="nav-bell {{ extra_class }}" href="{{ url_for('main.notifications') }}" aria-label="Notifications{% if unread_notifications %}, {{ unread_notifications }} unread{% endif %}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span class="nav-bell-badge"{% if not unread_notifications %} hidden{% endif %}>{{ '9+' if unread_notifications > 9 else unread_notifications }}</span>
+            </a>{% endmacro %}
 <body class="{% block body_class %}{% endblock %}">
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
@@ -55,6 +67,7 @@
         <span style="font-weight:800;letter-spacing:.06em;font-size:1.25em;color:var(--accent);">LEPREM</span>
         <span style="font-size:.7em;font-weight:400;opacity:.85;">Premier League Predictions</span>
       </a>
+      {% if current_user.is_authenticated %}{{ bell_link('nav-bell-mobile d-lg-none') }}{% endif %}
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -81,12 +94,7 @@
         <ul class="navbar-nav">
           {% if current_user.is_authenticated %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.profile') }}">{{ current_user.display_name }}</a></li>
-          <li class="nav-item">
-            <a class="nav-link nav-bell" href="{{ url_for('main.notifications') }}" aria-label="Notifications{% if unread_notifications %}, {{ unread_notifications }} unread{% endif %}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span class="nav-bell-badge"{% if not unread_notifications %} hidden{% endif %}>{{ '9+' if unread_notifications > 9 else unread_notifications }}</span>
-            </a>
-          </li>
+          <li class="nav-item d-none d-lg-block">{{ bell_link('nav-link') }}</li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">Log out</a></li>
           {% else %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">Log in</a></li>
@@ -214,13 +222,23 @@
         navigator.clearAppBadge().catch(function () {});
       }
     }
+    // Every bell on the page (desktop menu and mobile header) shares these classes.
+    function renderBells(count) {
+      document.querySelectorAll(".nav-bell-badge").forEach(function (badge) {
+        badge.textContent = count > 9 ? "9+" : String(count);
+        badge.hidden = count <= 0;
+      });
+      document.querySelectorAll(".nav-bell").forEach(function (bell) {
+        bell.setAttribute("aria-label", count > 0 ? "Notifications, " + count + " unread" : "Notifications");
+      });
+    }
     {% if current_user.is_authenticated %}
     setBadge({{ unread_notifications }});
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState !== "visible") return;
       fetch("{{ url_for('main.notifications_unread_count') }}", { credentials: "same-origin" })
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (data) { if (data) setBadge(data.count); })
+        .then(function (data) { if (data) { setBadge(data.count); renderBells(data.count); } })
         .catch(function () {});
     });
     {% else %}
