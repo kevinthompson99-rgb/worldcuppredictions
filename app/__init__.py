@@ -355,9 +355,19 @@ def register_cli(app):
 
 
 def register_template_helpers(app):
+    import base64
     from datetime import datetime
 
     from app.time_utils import to_london
+
+    # Read once at startup and inlined into every page's <head>, so iOS never has to
+    # fetch the home-screen icon over the network.
+    with open(os.path.join(app.static_folder, "icons", "apple-touch-icon-v3.png"), "rb") as f:
+        apple_icon_data_uri = "data:image/png;base64," + base64.b64encode(f.read()).decode("ascii")
+
+    @app.context_processor
+    def inject_apple_icon():
+        return {"apple_icon_data_uri": apple_icon_data_uri}
 
     @app.context_processor
     def inject_now():
