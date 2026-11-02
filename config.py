@@ -18,8 +18,26 @@ def _normalize_db_url(url: str) -> str:
     return url
 
 
+def _load_secret_key() -> str:
+    """Read SECRET_KEY from the environment; only local development may fall back."""
+    key = os.environ.get("SECRET_KEY")
+    if key:
+        return key
+    local_dev = (
+        os.environ.get("FLASK_ENV") == "development"
+        or os.environ.get("DEBUG", "").lower() in ("1", "true")
+        or os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true")
+    )
+    if local_dev:
+        return "dev-secret-key-change-me"
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. Set it before starting the app "
+        "(for local development only, set FLASK_ENV=development or DEBUG=1)."
+    )
+
+
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+    SECRET_KEY = _load_secret_key()
 
     SQLALCHEMY_DATABASE_URI = _normalize_db_url(
         os.environ.get("DATABASE_URL", "sqlite:///" + os.path.join(os.getcwd(), "app.db"))
