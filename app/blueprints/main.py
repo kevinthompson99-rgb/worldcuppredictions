@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
@@ -51,6 +51,15 @@ def service_worker():
         versioned,
         mimetype="application/javascript",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@bp.route("/apple-touch-icon.png")
+@bp.route("/apple-touch-icon-precomposed.png")
+def apple_touch_icon():
+    """iOS requests these root paths by default; serve the icon directly, no login or redirect."""
+    return send_from_directory(
+        os.path.join(current_app.static_folder, "icons"), "apple-touch-icon-v2.png", mimetype="image/png"
     )
 
 
