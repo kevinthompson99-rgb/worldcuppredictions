@@ -28,6 +28,30 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
     csrf.init_app(app)
 
+    _ICON_PATHS = (
+        "/apple-touch-icon.png",
+        "/apple-touch-icon-precomposed.png",
+        "/static/manifest.json",
+    )
+
+    @app.after_request
+    def icon_headers(response):
+        # iOS fetches home-screen icons from a system process with no cookies, so keep
+        # these responses plain and cacheable: no cookie, Vary: Cookie or attachment headers.
+        if request.path in _ICON_PATHS or request.path.startswith("/static/icons/"):
+            response.headers.pop("Set-Cookie", None)
+            response.headers.pop("Content-Disposition", None)
+            vary = [v.strip() for v in response.headers.get("Vary", "").split(",") if v.strip()]
+            vary = [v for v in vary if v.lower() != "cookie"]
+            if vary:
+                response.headers["Vary"] = ", ".join(vary)
+            else:
+                response.headers.pop("Vary", None)
+            response.headers["Cache-Control"] = "public, max-age=86400"
+            response.direct_passthrough = False
+            response.headers["Content-Length"] = str(len(response.get_data()))
+        return response
+
     @app.errorhandler(CSRFError)
     def handle_csrf_error(error):
         flash("Your session timed out, please try again", "warning")

@@ -59,7 +59,7 @@ def service_worker():
 def apple_touch_icon():
     """iOS requests these root paths by default; serve the icon directly, no login or redirect."""
     return send_from_directory(
-        os.path.join(current_app.static_folder, "icons"), "apple-touch-icon-v2.png", mimetype="image/png"
+        os.path.join(current_app.static_folder, "icons"), "apple-touch-icon-v3.png", mimetype="image/png"
     )
 
 

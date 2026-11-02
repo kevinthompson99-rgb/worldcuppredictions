@@ -1,10 +1,10 @@
 // Bump this on every deploy that changes the cached shell — a byte-for-byte
 // diff in this file is what makes the browser notice an update is available.
-const CACHE_NAME = "leprem-shell-v2";
+const CACHE_NAME = "leprem-shell-v3";
 
 const APP_SHELL_URLS = [
   "/static/manifest.json",
-  "/static/icons/apple-touch-icon.png",
+  "/static/icons/apple-touch-icon-v3.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
 ];
