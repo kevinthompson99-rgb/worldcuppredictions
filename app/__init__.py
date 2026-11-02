@@ -3,7 +3,8 @@ import os
 import time
 
 import click
-from flask import Flask
+from flask import Flask, flash, redirect, request
+from flask_wtf.csrf import CSRFError
 
 from app.extensions import csrf, db, login_manager, migrate
 from config import Config
@@ -26,6 +27,14 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(error):
+        flash("Your session timed out, please try again", "warning")
+        target = request.referrer
+        if not target or request.host not in target:
+            target = request.url_root
+        return redirect(target)
 
     from app import models  # noqa: F401  (registers models with SQLAlchemy)
 

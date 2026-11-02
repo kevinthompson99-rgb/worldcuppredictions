@@ -1,10 +1,10 @@
 // Bump this on every deploy that changes the cached shell — a byte-for-byte
 // diff in this file is what makes the browser notice an update is available.
-const CACHE_NAME = "leprem-shell-v1";
+const CACHE_NAME = "leprem-shell-v2";
 
 const APP_SHELL_URLS = [
-  "/",
   "/static/manifest.json",
+  "/static/icons/apple-touch-icon.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
 ];
@@ -23,10 +23,10 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Pages: network-first (so logged-in players always see live scores/results
-// when online) falling back to the cached shell when offline. Static assets:
-// cache-first, since they only change on deploy and a fresh CACHE_NAME clears
-// stale copies anyway.
+// Pages: always straight to the network and never cached. Almost every page
+// carries a form with a CSRF token, and a cached copy replays a stale token.
+// Static assets: cache-first, since they only change on deploy and a fresh
+// CACHE_NAME clears stale copies anyway.
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -34,18 +34,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
-    );
-    return;
-  }
+  if (request.mode === "navigate") return;
 
   if (url.pathname.startsWith("/static/")) {
     event.respondWith(

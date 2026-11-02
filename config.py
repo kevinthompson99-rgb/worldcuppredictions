@@ -26,6 +26,10 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # CSRF tokens are tied to the session cookie, so no separate expiry: the default
+    # 1 hour limit broke forms left open in the installed PWA.
+    WTF_CSRF_TIME_LIMIT = None
+
     # football-data.org API
     FOOTBALL_DATA_API_KEY = os.environ.get("FOOTBALL_DATA_API_KEY")
     FOOTBALL_DATA_BASE_URL = "https://api.football-data.org/v4"
