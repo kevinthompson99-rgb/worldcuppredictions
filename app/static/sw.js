@@ -1,6 +1,6 @@
 // Bump this on every deploy that changes the cached shell — a byte-for-byte
 // diff in this file is what makes the browser notice an update is available.
-const CACHE_NAME = "leprem-shell-v4";
+const CACHE_NAME = "leprem-shell-v5";
 
 const APP_SHELL_URLS = [
   "/static/manifest.json",
@@ -95,8 +95,12 @@ self.addEventListener("push", function(event) {
   // it works from a page - try it directly here, but also ask any open window to
   // set it from its own page context, which is more likely to actually work.
   var tasks = [self.registration.showNotification(title, options)];
-  if ("setAppBadge" in self.navigator) {
-    tasks.push(self.navigator.setAppBadge(1).catch(function () {}));
+  try {
+    if ("setAppBadge" in self.navigator) {
+      tasks.push(self.navigator.setAppBadge(1).catch(function () {}));
+    }
+  } catch (badgeErr) {
+    // A synchronous throw here must not stop event.waitUntil() below from running.
   }
   tasks.push(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {

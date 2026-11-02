@@ -81,6 +81,9 @@ def create_app(config_class=Config):
     run_startup_tasks(app)
     _reenable_app_loggers()
     maybe_start_scheduler(app)
+    from app.push import log_vapid_status
+
+    log_vapid_status(app)
 
     return app
 

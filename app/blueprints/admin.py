@@ -505,11 +505,15 @@ def test_push():
     form = CSRFForm()
     if not form.validate_on_submit():
         abort(400)
+    from collections import Counter
+
     from app.push import notify_all
+    report = {"failures": []}
     sent, total = notify_all(
         title="LEPREM Test",
         body="Push notifications are working!",
-        url="/"
+        url="/",
+        report=report,
     )
     if total == 0:
         flash(
@@ -517,8 +521,12 @@ def test_push():
             "device from the Notifications screen first.",
             "warning",
         )
-    elif sent == total:
-        flash(f"Test notification sent to all {total} subscriber(s).", "success")
     else:
-        flash(f"Sent to {sent} of {total} subscriber(s) - check server logs for the rest.", "warning")
+        failed = total - sent
+        flash(
+            f"Test push: {total} subscription(s) found, {sent} sent, {failed} failed.",
+            "success" if failed == 0 else "warning",
+        )
+        for reason, count in Counter(report["failures"]).items():
+            flash(f"{count} failed: {reason}", "danger")
     return redirect(url_for("admin.dashboard"))
