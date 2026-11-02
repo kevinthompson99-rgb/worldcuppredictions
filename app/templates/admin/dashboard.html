@@ -79,6 +79,52 @@
   </div>
 </div>
 
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title">Share the app</h5>
+    {% for label, field_id, value in [("App link", "share-app-link", app_link), ("Sign-up link", "share-signup-link", signup_link)] %}
+    <label class="form-label small text-muted mb-1" for="{{ field_id }}">{{ label }}</label>
+    <div class="input-group mb-3">
+      <input type="text" readonly class="form-control form-control-lg" id="{{ field_id }}" value="{{ value }}" onfocus="this.select()">
+      <button type="button" class="btn btn-outline-primary js-copy" data-target="{{ field_id }}" style="min-width:5.5rem;">Copy</button>
+    </div>
+    {% endfor %}
+    <button type="button" class="btn btn-outline-primary" id="js-share" data-url="{{ app_link }}" hidden>Share</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  function copyText(input) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(input.value);
+    }
+    return new Promise(function (resolve, reject) {
+      input.focus();
+      input.select();
+      input.setSelectionRange(0, input.value.length);
+      try { document.execCommand("copy") ? resolve() : reject(); } catch (e) { reject(e); }
+    });
+  }
+  document.querySelectorAll(".js-copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var input = document.getElementById(button.dataset.target);
+      copyText(input).then(function () {
+        button.textContent = "Copied";
+        setTimeout(function () { button.textContent = "Copy"; }, 2000);
+      }).catch(function () { input.focus(); input.select(); });
+    });
+  });
+  var shareButton = document.getElementById("js-share");
+  if (navigator.share) {
+    shareButton.hidden = false;
+    shareButton.addEventListener("click", function () {
+      navigator.share({ title: "LEPREM", url: shareButton.dataset.url }).catch(function () {});
+    });
+  }
+})();
+</script>
+
 <p class="text-muted">
   Fixture sync pulls matches from football-data.org and auto-creates/populates each
   gameweek from the API's own matchday number &mdash; use "Manage gameweeks" to publish

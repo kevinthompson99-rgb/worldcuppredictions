@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -34,9 +35,22 @@ def require_admin():
     pass
 
 
+def _share_links():
+    """App and sign-up links for the dashboard's "Share the app" card.
+
+    APP_URL wins when set; otherwise the current request host with https forced, since
+    Railway terminates TLS at its proxy and request.scheme would report http.
+    """
+    base = (os.environ.get("APP_URL") or "").strip().rstrip("/")
+    if not base:
+        base = "https://" + request.host
+    return base + "/", base + url_for("auth.register")
+
+
 @bp.route("/")
 def dashboard():
     draft_gameweeks = get_draft_gameweeks()
+    app_link, signup_link = _share_links()
     return render_template(
         "admin/dashboard.html",
         active_gameweek=get_active_gameweek(),
@@ -48,6 +62,8 @@ def dashboard():
         user_count=User.query.count(),
         last_poll=PollLog.query.order_by(PollLog.run_at.desc()).first(),
         form=CSRFForm(),
+        app_link=app_link,
+        signup_link=signup_link,
     )
 
 
