@@ -235,3 +235,11 @@ def build_permutations_notification(result):
         + "\n\nAll other players are now on the bench"
     )
     return title, body
+
+
+def build_permutations_headline(result):
+    """Banner preview for the permutations push: skips the "N players in contention" preamble
+    so the first thing visible is who can win and what score they need."""
+    if result["already_won"] or not result["contenders"]:
+        return None
+    return "; ".join(f"{user.display_name} {summary}" for user, summary in result["contenders"])

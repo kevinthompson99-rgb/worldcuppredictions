@@ -346,7 +346,7 @@ class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)
-    short_body = db.Column(db.String(100), nullable=False)
+    short_body = db.Column(db.String(200), nullable=False)
     full_body = db.Column(db.Text, nullable=False)
     url = db.Column(db.String(500), nullable=False, default="/")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

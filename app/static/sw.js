@@ -1,6 +1,6 @@
 // Bump this on every deploy that changes the cached shell — a byte-for-byte
 // diff in this file is what makes the browser notice an update is available.
-const CACHE_NAME = "leprem-shell-v5";
+const CACHE_NAME = "leprem-shell-v6";
 
 const APP_SHELL_URLS = [
   "/static/manifest.json",
@@ -60,26 +60,23 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("push", function(event) {
-  // event.data.json() can throw (decryption hiccup, or a payload that isn't valid
-  // JSON) - if it does without a try/catch, the handler throws before
-  // event.waitUntil() is ever called, and the browser falls back to its own blank
-  // "generic" notification (a push event MUST result in *some* notification per
-  // spec) - which is exactly a silent, empty banner with no useful click target.
-  // Falling back to the raw payload text at least makes a decryption/format
-  // problem visible instead of invisible.
+  // Parse defensively: a payload that is not valid JSON falls back to its raw text as
+  // the body. If title and body are both missing the banner reads "LEPREM" / "Tap to
+  // read your latest update" rather than the browser's generic "Notification".
   var payload = {};
   if (event.data) {
     try {
-      payload = event.data.json();
+      payload = event.data.json() || {};
     } catch (jsonErr) {
-      var raw;
-      try { raw = event.data.text(); } catch (textErr) { raw = "(unreadable push payload)"; }
-      payload = { title: "LEPREM", body: raw };
+      var raw = "";
+      try { raw = event.data.text(); } catch (textErr) { raw = ""; }
+      payload = { body: raw };
     }
   }
-  var title = payload.title || "LEPREM";
+  var title = (payload.title && String(payload.title).trim()) || "LEPREM";
+  var body = (payload.body && String(payload.body).trim()) || "Tap to read your latest update";
   var options = {
-    body: payload.body || "",
+    body: body,
     icon: "/static/icons/icon-192.png",
     badge: "/static/icons/icon-192.png",
     data: { url: payload.url || "/", notification_id: payload.notification_id || null }

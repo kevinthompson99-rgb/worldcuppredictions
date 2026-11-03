@@ -25,7 +25,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.extensions import db
 from app.models import GAMEWEEK_STATUS_ACTIVE, Fixture, Gameweek, PollLog
-from app.permutations import build_permutations_notification, calculate_final_permutations
+from app.permutations import (
+    build_permutations_headline,
+    build_permutations_notification,
+    calculate_final_permutations,
+)
 from app.push import notify_gameweek_participants
 from app.sync import sync_fixtures_and_results
 from app.time_utils import to_london
@@ -224,7 +228,9 @@ def _run_final_permutations_notify(app):
                 continue
 
             title, body = build_permutations_notification(result)
-            notify_gameweek_participants(gameweek, title, body, url="/leaderboard")
+            notify_gameweek_participants(
+                gameweek, title, body, url="/leaderboard", short_body=build_permutations_headline(result)
+            )
             gameweek.notified_permutations = True
             db.session.commit()
             logger.info("Sent final-fixture permutations notification for %s", gameweek.name)

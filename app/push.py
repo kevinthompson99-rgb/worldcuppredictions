@@ -44,7 +44,7 @@ def _send(subscription, title, body, url, notification_id):
                 "endpoint": subscription.endpoint,
                 "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
             },
-            data=json.dumps({"title": title, "body": body, "url": url, "notification_id": notification_id}),
+            data=json.dumps({"title": title or DEFAULT_TITLE, "body": body or DEFAULT_BODY, "url": url, "notification_id": notification_id}),
             vapid_private_key=vapid_private_key,
             vapid_claims={"sub": vapid_claims_email},
         )
@@ -96,28 +96,38 @@ def log_vapid_status(app):
         logger.warning("VAPID_CLAIMS_EMAIL must start with mailto: or https:// - sends will fail until it does")
 
 
-SHORT_BODY_LIMIT = 100
+SHORT_BODY_LIMIT = 140
+DEFAULT_TITLE = "LEPREM"
+DEFAULT_BODY = "Tap to read your latest update"
 
 
-def make_short_body(body):
-    """Key point first, under 100 characters: the first sentence if it fits, else a word-boundary cut."""
-    body = " ".join(body.split())
-    if len(body) < SHORT_BODY_LIMIT:
+def make_short_body(body, limit=SHORT_BODY_LIMIT):
+    """Banner preview of at most `limit` characters, key point first.
+
+    Uses the first sentence if it fits, otherwise fills to the limit, cutting at a word
+    boundary with an ellipsis. Never returns an empty string.
+    """
+    body = " ".join((body or "").split())
+    if not body:
+        return DEFAULT_BODY
+    if len(body) <= limit:
         return body
     first_sentence = body.split(". ")[0].rstrip(".")
-    if len(first_sentence) < SHORT_BODY_LIMIT and first_sentence != body:
+    if first_sentence != body and len(first_sentence) + 1 <= limit:
         return first_sentence + "."
-    cut = body[: SHORT_BODY_LIMIT - 1].rsplit(" ", 1)[0].rstrip(",;:- ")
-    return cut + "\u2026"
+    cut = body[: limit - 1].rsplit(" ", 1)[0].rstrip(",;:- ")
+    return (cut or body[: limit - 1]) + "\u2026"
 
 
 def _deliver(user_ids, title, body, url, short_body=None, report=None):
     """Create one inbox row per recipient, then push each of their subscriptions.
 
-    The push carries the short text and points at /notifications/<id>; the full text and
-    the original `url` live on the Notification row. Returns (sent, total) subscriptions.
+    The push carries a non-empty title and a preview of the message (`short_body`, or one
+    derived from `body`) and points at /notifications/<id>; the full text and the original
+    `url` live on the Notification row. Returns (sent, total) subscriptions.
     """
-    short = short_body or make_short_body(body)
+    title = (title or "").strip() or DEFAULT_TITLE
+    short = make_short_body(short_body or body)
     sent = total = 0
     for user_id in sorted(user_ids):
         notification = Notification(user_id=user_id, title=title, short_body=short, full_body=body, url=url)
@@ -134,16 +144,16 @@ def _deliver(user_ids, title, body, url, short_body=None, report=None):
     return sent, total
 
 
-def notify_all(title, body, url="/", report=None):
+def notify_all(title, body, url="/", report=None, short_body=None):
     """Returns (sent, total) so callers can report delivery diagnostics if they want to.
 
     Pass `report={"failures": []}` to collect each failed send's reason.
     """
     user_ids = {user_id for (user_id,) in db.session.query(PushSubscription.user_id).distinct()}
-    return _deliver(user_ids, title, body, url, report=report)
+    return _deliver(user_ids, title, body, url, short_body=short_body, report=report)
 
 
-def notify_gameweek_participants(gameweek, title, body, url="/"):
+def notify_gameweek_participants(gameweek, title, body, url="/", short_body=None):
     """Send to users opted in (GameweekEntry.opted_in=True) to `gameweek`'s pot.
 
     Returns (sent, total) so callers can report delivery diagnostics if they want to.
@@ -154,4 +164,4 @@ def notify_gameweek_participants(gameweek, title, body, url="/"):
     }
     if not user_ids:
         return 0, 0
-    return _deliver(user_ids, title, body, url)
+    return _deliver(user_ids, title, body, url, short_body=short_body)
